@@ -1,6 +1,6 @@
 {
 	"nsRecords": {
-		"closeComment": "Thanks for your interest in is-a.dev!\n\nThis pull request requests `NS` records. We do not grant nameserver records to first-time contributors, so I am closing this pull request.\n\nYou are welcome to open a new pull request using other record types, such as `A`, `AAAA`, `CNAME`, `MX` or `TXT`. Once you have an accepted registration, you can request `NS` records with a clear justification for why they are needed."
+		"closeComment": "Thanks for your interest in is-a.dev!\n\nThis pull request requests `NS` records. We do not grant nameserver records to first-time contributors, so I am closing this pull request.\n\nYou are welcome to open a new pull request using other record types, such as `A`, `AAAA`, `CNAME`, `MX` or `TXT`. Once you have an accepted registration, you can request `NS` records with a clear justification for why they are needed.\n\nPlease see the [Docs](https://docs.is-a.dev/faq/#who-can-use-ns-records) for more information."
 	},
 	"noReplyEmail": {
 		"reviewComment": "Your `owner.email` value is a GitHub no-reply email address. We do not allow these on our service. Please update it to a personal email address or remove the `owner.email` field entirely, as it is optional.",
