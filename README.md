@@ -78,7 +78,7 @@ deno task lint
 
 The `deploy` folder is a runit service, laid out like the one in the `web` project.
 
-- `deploy/run` starts the built app as `clove` from `/srv/clove/is-a-tracker` on port 3101.
+- `deploy/run` starts the built app as `clove` from `/srv/clove/isATracker` on port 3101.
 - `deploy/log/run` sends its output to `/var/log/is-a-tracker` through `svlogd`.
 
 The server folder needs `build/`, `node_modules/`, `config/`, `package.json` and `.env`.
