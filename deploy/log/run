@@ -1,0 +1,9 @@
+#!/bin/sh
+# deploy/log/run
+# MIT — (c) Doughmination System®
+# runit log service for is-a-tracker: everything the app prints ends up here,
+# timestamped and rotated by svlogd
+LOG_DIR=/var/log/is-a-tracker
+
+mkdir -p "$LOG_DIR"
+exec svlogd -tt "$LOG_DIR"

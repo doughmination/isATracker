@@ -1,0 +1,26 @@
+#!/bin/sh
+# deploy/run
+# MIT — (c) Doughmination System®
+exec 2>&1
+
+cd /srv/clove/is-a-tracker || exit 1
+
+export HOST=127.0.0.1
+export PORT=3101
+export NODE_ENV=production
+
+# Run as clove rather than root. chpst doesn't change HOME, so set it for Deno's cache
+export HOME=/home/clove
+
+# Secrets (GitHub token, Discord bot token, dashboard password) and ORIGIN live in
+# /srv/clove/is-a-tracker/.env, which Deno skips if it's missing.
+# ORIGIN must be the dashboard's public URL: SvelteKit needs it for form actions (CSRF check)
+
+# Reads are limited to this folder; writes are limited to data/, where the SQLite file lives
+exec chpst -u clove /usr/bin/deno run \
+	--allow-net \
+	--allow-env \
+	--allow-read=. \
+	--allow-write=data \
+	--env-file=.env \
+	build/index.js
