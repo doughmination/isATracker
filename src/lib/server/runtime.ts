@@ -6,6 +6,7 @@ import { getConfig } from './config.ts';
 import { getDatabase } from './db/database.ts';
 import { flushNotifications, startDiscordBot, stopDiscordBot } from './discord/bot.ts';
 import { removeFindingListeners } from './events.ts';
+import { checkToken } from './github/token.ts';
 import { createLogger } from './logger.ts';
 import { startScanner, stopScanner } from './moderation/scanner.ts';
 
@@ -37,9 +38,8 @@ export async function startServices(): Promise<void> {
 
 	logger.info(config.dryRun ? 'Dry run is ON: GitHub will not be changed' : 'Dry run is OFF');
 
-	if (!config.githubToken) {
-		logger.warn('GITHUB_TOKEN missing; reads are limited to 60 an hour and actions will fail');
-	}
+	// Not awaited: a slow or failing GitHub must not delay the dashboard or the bot
+	void checkToken();
 
 	await startDiscordBot().catch((error) => logger.error('Discord failed to start', error));
 

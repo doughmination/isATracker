@@ -21,9 +21,18 @@ One Deno process runs the scanner, the Discord bot, and the SvelteKit dashboard.
 
 ### GitHub token
 
-- Needs **Pull requests: Read and write** on `is-a-dev/register`.
-- A fine-grained token only works if the `is-a-dev` organisation lets you select the repository.
-  If it does not appear in the list, use a classic token with the `public_repo` scope instead.
+Use a **classic** personal access token. Fine-grained tokens cannot select `is-a-dev/register`
+unless the organisation allows it.
+
+1. Open <https://github.com/settings/tokens> and choose **Tokens (classic)**.
+2. Generate a new token and tick only **`public_repo`**.
+3. Paste it into `GITHUB_TOKEN`.
+
+- A classic token reaches every public repository your account can write to. The tool only
+  ever calls the repository set in `GITHUB_REPO_OWNER` and `GITHUB_REPO_NAME`.
+- At startup the tool checks the token and logs its account, its scopes, and whether that
+  account may close pull requests on the repository.
+- If the organisation enforces single sign-on, authorise the token under **Configure SSO**.
 
 ### Discord bot
 

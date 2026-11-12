@@ -54,6 +54,21 @@ export interface GitHubResponse<Data> {
 	data: Data;
 	etag: string | null;
 	notModified: boolean;
+	// Scopes of a classic token; null when GitHub sends none (fine-grained or no token)
+	scopes: string[] | null;
+}
+
+function readScopes(headers: Headers): string[] | null {
+	const header = headers.get('x-oauth-scopes');
+
+	if (header === null) {
+		return null;
+	}
+
+	return header
+		.split(',')
+		.map((scope) => scope.trim())
+		.filter((scope) => scope !== '');
 }
 
 function assertWithinRateLimit(resource: string, priority: boolean): void {
@@ -159,7 +174,8 @@ async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Da
 			status: 304,
 			data: undefined as Data,
 			etag,
-			notModified: true
+			notModified: true,
+			scopes: readScopes(response.headers)
 		};
 	}
 
@@ -175,6 +191,13 @@ async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Da
 		throw new RateLimitError(resumeAt);
 	}
 
+	if (response.status === 403 && response.headers.has('x-github-sso')) {
+		throw new GitHubError(
+			403,
+			'The organisation uses single sign-on: authorise this token for it under "Configure SSO" in your GitHub token settings.'
+		);
+	}
+
 	if (!response.ok) {
 		throw new GitHubError(response.status, await readErrorMessage(response));
 	}
@@ -187,7 +210,8 @@ async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Da
 		status: response.status,
 		data: data as Data,
 		etag,
-		notModified: false
+		notModified: false,
+		scopes: readScopes(response.headers)
 	};
 }
 
