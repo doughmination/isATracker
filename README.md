@@ -45,8 +45,10 @@ The bot uses the Gateway, so nothing needs to be exposed to the internet.
 
 ## Dry run
 
-`DRY_RUN` is **on by default**. While it is on, buttons revalidate the PR and report what they
-would have done, and nothing is sent to GitHub. Set `DRY_RUN=false` once you trust what you see.
+`DRY_RUN` is **off by default**: an approved action really closes or reviews the PR.
+
+Set `DRY_RUN=true` to rehearse. Buttons then revalidate the PR and report what they would have
+done, and nothing is sent to GitHub.
 
 ## Wording
 

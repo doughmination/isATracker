@@ -56,8 +56,8 @@ export function getConfig(): AppConfig {
 		messagesPath: readText('MESSAGES_PATH', 'config/messages.json'),
 		pollIntervalSeconds: Math.max(30, readNumber('POLL_INTERVAL_SECONDS', 120)),
 		scannerEnabled: readFlag('SCANNER_ENABLED', true),
-		// Dry run is the default: nothing is sent to GitHub until it is switched off
-		dryRun: readFlag('DRY_RUN', true),
+		// Live by default: approved actions reach GitHub unless DRY_RUN=true
+		dryRun: readFlag('DRY_RUN', false),
 		dashboardPassword: readText('DASHBOARD_PASSWORD'),
 		maxFilesPerPullRequest: readNumber('MAX_FILES_PER_PR', 25),
 		nsMinMergedPullRequests: readNumber('NS_MIN_MERGED_PRS', 1),
