@@ -7,7 +7,7 @@ import { Client, Events, MessageFlags, type Interaction } from 'discord.js';
 import { getConfig } from '../config.ts';
 import { getFinding, listUnnotifiedFindings, setFindingDiscordMessage } from '../db/findings.ts';
 import { onFindingEvent } from '../events.ts';
-import { createLogger } from '../logger.ts';
+import { createLogger, sleep } from '../logger.ts';
 import { performModerationAction, type ModerationDecision } from '../moderation/actions.ts';
 import { buttonPrefix, renderFinding } from './render.ts';
 
@@ -140,28 +140,68 @@ async function handleInteraction(interaction: Interaction): Promise<void> {
 	await refreshNotification(findingId);
 }
 
-export async function startDiscordBot(): Promise<void> {
+function createClient(): Client {
+	// Buttons and direct messages need no privileged gateway intents
+	const newClient = new Client({ intents: [] });
+
+	newClient.once(Events.ClientReady, (readyClient) => {
+		logger.info(`Connected as ${readyClient.user.tag}`);
+
+		void flushNotifications().catch((error) => logger.warn('Catch-up failed', error));
+	});
+
+	newClient.on(Events.InteractionCreate, (interaction) => {
+		void handleInteraction(interaction).catch((error) => logger.error('Interaction failed', error));
+	});
+
+	newClient.on(Events.Error, (error) => logger.error('Gateway error', error));
+
+	return newClient;
+}
+
+const retryDelaysSeconds = [5, 15, 30, 60];
+
+// Each start gets a new number, so a stop or restart ends any older login loop
+let loginGeneration = 0;
+
+function isBadToken(error: unknown): boolean {
+	return (error as { code?: string } | null)?.code === 'TokenInvalid';
+}
+
+// Keeps trying until Discord accepts the login, e.g. when the service starts before the network
+async function loginWithRetry(discordToken: string, generation: number): Promise<void> {
+	for (let attempt = 0; generation === loginGeneration; attempt += 1) {
+		const candidate = createClient();
+
+		client = candidate;
+
+		try {
+			await candidate.login(discordToken);
+			return;
+		} catch (error) {
+			await candidate.destroy().catch(() => undefined);
+
+			if (isBadToken(error)) {
+				logger.error('DISCORD_BOT_TOKEN was rejected; Discord is disabled', error);
+				return;
+			}
+
+			const delaySeconds = retryDelaysSeconds[Math.min(attempt, retryDelaysSeconds.length - 1)];
+
+			logger.warn(`Discord login failed; retrying in ${delaySeconds}s`, error);
+
+			await sleep(delaySeconds * 1000);
+		}
+	}
+}
+
+export function startDiscordBot(): void {
 	const { discordToken, discordUserId } = getConfig();
 
 	if (!discordToken || !discordUserId) {
 		logger.warn('DISCORD_BOT_TOKEN or DISCORD_USER_ID missing; Discord is disabled');
 		return;
 	}
-
-	// Buttons and direct messages need no privileged gateway intents
-	client = new Client({ intents: [] });
-
-	client.once(Events.ClientReady, (readyClient) => {
-		logger.info(`Connected as ${readyClient.user.tag}`);
-
-		void flushNotifications().catch((error) => logger.warn('Catch-up failed', error));
-	});
-
-	client.on(Events.InteractionCreate, (interaction) => {
-		void handleInteraction(interaction).catch((error) => logger.error('Interaction failed', error));
-	});
-
-	client.on(Events.Error, (error) => logger.error('Gateway error', error));
 
 	onFindingEvent('findingCreated', (findingId) => {
 		void sendNotification(findingId).catch((error) =>
@@ -175,10 +215,15 @@ export async function startDiscordBot(): Promise<void> {
 		);
 	});
 
-	await client.login(discordToken);
+	loginGeneration += 1;
+
+	// Not awaited: the scanner and dashboard start while Discord is still connecting
+	void loginWithRetry(discordToken, loginGeneration);
 }
 
 export async function stopDiscordBot(): Promise<void> {
+	loginGeneration += 1;
+
 	await client?.destroy();
 	client = undefined;
 }
