@@ -12,6 +12,7 @@ export interface AppConfig {
 	databasePath: string;
 	messagesPath: string;
 	unsupportedCnamesPath: string;
+	avatarPath: string;
 	pollIntervalSeconds: number;
 	scannerEnabled: boolean;
 	dryRun: boolean;
@@ -56,6 +57,7 @@ export function getConfig(): AppConfig {
 		databasePath: readText('DATABASE_PATH', 'data/tracker.sqlite'),
 		messagesPath: readText('MESSAGES_PATH', 'config/messages.json'),
 		unsupportedCnamesPath: readText('UNSUPPORTED_CNAMES_PATH', 'config/unsupportedCnames.json'),
+		avatarPath: readText('AVATAR_PATH', 'config/avatar.png'),
 		pollIntervalSeconds: Math.max(30, readNumber('POLL_INTERVAL_SECONDS', 120)),
 		scannerEnabled: readFlag('SCANNER_ENABLED', true),
 		// Live by default: approved actions reach GitHub unless DRY_RUN=true

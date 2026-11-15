@@ -6,7 +6,8 @@
 	import '../app.css';
 
 	import { page } from '$app/state';
-	import favicon from '#lib/assets/favicon.svg';
+	// Same file the Discord bot uses as its avatar
+	import favicon from '../../config/avatar.png';
 
 	import type { LayoutProps } from './$types';
 

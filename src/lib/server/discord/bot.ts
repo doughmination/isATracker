@@ -2,10 +2,14 @@
  * MIT — (c) Doughmination System®
  */
 
-import { Client, Events, MessageFlags, type Interaction } from 'discord.js';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+import { Client, Events, MessageFlags, type ClientUser, type Interaction } from 'discord.js';
 
 import { getConfig } from '../config.ts';
 import { getFinding, listUnnotifiedFindings, setFindingDiscordMessage } from '../db/findings.ts';
+import { getValue, setValue } from '../db/keyValue.ts';
 import { onFindingEvent } from '../events.ts';
 import { createLogger, sleep } from '../logger.ts';
 import { performModerationAction, type ModerationDecision } from '../moderation/actions.ts';
@@ -141,12 +145,33 @@ async function handleInteraction(interaction: Interaction): Promise<void> {
 	await refreshNotification(findingId);
 }
 
+const avatarHashKey = 'discordAvatarHash';
+
+// Uploads config/avatar.png only when it changed, since Discord rate-limits avatar edits
+async function syncAvatar(user: ClientUser): Promise<void> {
+	const image = readFileSync(getConfig().avatarPath);
+	const hash = createHash('sha256').update(image).digest('hex');
+
+	if (getValue(avatarHashKey) === hash) {
+		return;
+	}
+
+	await user.setAvatar(image);
+	setValue(avatarHashKey, hash);
+
+	logger.info('Updated the bot avatar from the avatar file');
+}
+
 function createClient(): Client {
 	// Buttons and direct messages need no privileged gateway intents
 	const newClient = new Client({ intents: [] });
 
 	newClient.once(Events.ClientReady, (readyClient) => {
 		logger.info(`Connected as ${readyClient.user.tag}`);
+
+		void syncAvatar(readyClient.user).catch((error) =>
+			logger.warn('Could not update the bot avatar; will try again next start', error)
+		);
 
 		void flushNotifications().catch((error) => logger.warn('Catch-up failed', error));
 	});

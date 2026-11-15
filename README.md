@@ -60,6 +60,19 @@ List hosts in `config/unsupportedCnames.json` as a JSON array, for example
 `["vercel.app", "example.com"]`. A CNAME matches an entry or any subdomain of it.
 Changes apply on the next scan. An empty list turns the rule off.
 
+## Avatar
+
+`config/avatar.png` is the dashboard favicon and the Discord bot's avatar. Replace the file to
+change both. The site picks it up on the next build. The bot uploads it on its next start, and
+only when the file has changed, because Discord rate-limits avatar edits.
+
+`config/avatar.svg` is the vector source the PNG was rendered from. Discord only accepts raster
+avatars, so the PNG is the file both actually use. After editing the SVG, re-render the PNG:
+
+```
+magick -background none -density 48 config/avatar.svg -resize 512x512 config/avatar.png
+```
+
 ## Severity
 
 When a PR breaks several rules, the most serious leads: NS (High), then CNAME (Medium),
