@@ -34,8 +34,12 @@ export interface Violation {
 export interface Rule {
 	id: RuleId;
 	title: string;
+	// 3 = most serious; a PR crossing several rules is led by its highest
+	severity: 1 | 2 | 3;
 	actionType: Exclude<ActionType, 'ignore'>;
 	actionLabel: string;
+	// Line for an inline review comment; only requestChanges rules need it
+	findLine?: (file: DomainFile) => number | null;
 	evaluate: (context: RuleContext) => Promise<Violation[]>;
 }
 

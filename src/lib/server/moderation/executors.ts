@@ -14,7 +14,7 @@ import {
 	listReviews
 } from '../github/pullRequests.ts';
 import { getMessages } from '../messages.ts';
-import { findNoReplyEmail, findOwnerEmailLine } from '../rules/noReplyEmail.ts';
+import { getRule } from '../rules/index.ts';
 import type { ActionOutcome, ActionType, FindingRow, PullRequestSummary } from '../types.ts';
 import type { Evaluation } from './evaluate.ts';
 import { retireFindings } from './reconcile.ts';
@@ -56,9 +56,19 @@ function reviewMarker(finding: FindingRow): string {
 	return `<!-- is-a-tracker:${finding.ruleId}:${finding.filePath} -->`;
 }
 
-async function requestEmailChanges(input: ExecutorInput): Promise<ActionOutcome> {
+function reviewMessages(finding: FindingRow) {
+	const messages = getMessages();
+
+	if (finding.ruleId === 'nsRecords') {
+		throw new Error('NS findings close the PR; they have no review wording.');
+	}
+
+	return messages[finding.ruleId];
+}
+
+async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> {
 	const { pullRequest, finding, evaluation } = input;
-	const messages = getMessages().noReplyEmail;
+	const messages = reviewMessages(finding);
 	const marker = reviewMarker(finding);
 
 	const login = await getAuthenticatedLogin();
@@ -81,8 +91,8 @@ async function requestEmailChanges(input: ExecutorInput): Promise<ActionOutcome>
 	}
 
 	const file = evaluation.files.find((candidate) => candidate.path === finding.filePath);
-	const email = file ? findNoReplyEmail(file.json) : null;
-	const line = file && email ? findOwnerEmailLine(file.content, email) : null;
+	const findLine = getRule(finding.ruleId).findLine;
+	const line = file && findLine ? findLine(file) : null;
 	const canCommentInline = line !== null && getCommentableLines(file?.patch).has(line);
 
 	const fallbackBody = `${messages.reviewComment}\n\nFile: \`${finding.filePath}\`\n\n${marker}`;
@@ -132,5 +142,5 @@ async function requestEmailChanges(input: ExecutorInput): Promise<ActionOutcome>
 
 export const executors: Record<Exclude<ActionType, 'ignore'>, Executor> = {
 	closePr: closeWithPolicyComment,
-	requestChanges: requestEmailChanges
+	requestChanges: requestRuleChanges
 };

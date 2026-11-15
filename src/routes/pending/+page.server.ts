@@ -9,12 +9,14 @@ import {
 	performModerationAction,
 	type ModerationDecision
 } from '#lib/server/moderation/actions.ts';
-import { getRule } from '#lib/server/rules/index.ts';
+import { bySeverity, getRule } from '#lib/server/rules/index.ts';
 
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
-	const findings = listOpenFindings().map((finding) => ({
+	const openFindings = listOpenFindings().sort(bySeverity);
+
+	const findings = openFindings.map((finding) => ({
 		id: finding.id,
 		prNumber: finding.prNumber,
 		title: finding.title,
@@ -27,7 +29,11 @@ export const load: PageServerLoad = () => {
 		lastOutcome: finding.lastOutcome,
 		createdAt: finding.createdAt,
 		actionLabel: getRule(finding.ruleId).actionLabel,
-		actionType: getRule(finding.ruleId).actionType
+		actionType: getRule(finding.ruleId).actionType,
+		severity: getRule(finding.ruleId).severity,
+		otherRuleIds: openFindings
+			.filter((other) => other.prNumber === finding.prNumber && other.id !== finding.id)
+			.map((other) => other.ruleId)
 	}));
 
 	return { findings };

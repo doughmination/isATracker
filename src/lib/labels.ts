@@ -6,7 +6,14 @@
 
 export const ruleLabels: Record<string, string> = {
 	nsRecords: 'NS records (first-time contributor)',
+	unsupportedCname: 'Unsupported CNAME target',
 	noReplyEmail: 'No-reply owner.email'
+};
+
+export const severityLabels: Record<number, string> = {
+	3: 'High',
+	2: 'Medium',
+	1: 'Low'
 };
 
 export const actionLabels: Record<string, string> = {

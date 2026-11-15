@@ -8,6 +8,7 @@ import { describe, test } from 'node:test';
 import { getCommentableLines } from '../github/diff.ts';
 import { findNoReplyEmail, findOwnerEmailLine } from './noReplyEmail.ts';
 import { findNsRecords } from './nsRecords.ts';
+import { findCnameLine, findUnsupportedCname } from './unsupportedCname.ts';
 
 describe('findNsRecords', () => {
 	test('finds NS records under "records"', () => {
@@ -74,6 +75,47 @@ describe('findNoReplyEmail', () => {
 		};
 
 		assert.equal(findNoReplyEmail(json), null);
+	});
+});
+
+describe('findUnsupportedCname', () => {
+	const unsupported = ['vercel.app', 'pages.dev'];
+
+	test('matches a listed host and its subdomains, ignoring case and a trailing dot', () => {
+		assert.equal(
+			findUnsupportedCname({ records: { CNAME: 'vercel.app' } }, unsupported),
+			'vercel.app'
+		);
+		assert.equal(
+			findUnsupportedCname({ record: { cname: 'Me.Pages.Dev.' } }, unsupported),
+			'Me.Pages.Dev.'
+		);
+	});
+
+	test('ignores supported hosts, look-alikes and missing CNAMEs', () => {
+		assert.equal(findUnsupportedCname({ records: { CNAME: 'me.github.io' } }, unsupported), null);
+		assert.equal(findUnsupportedCname({ records: { CNAME: 'notvercel.app' } }, unsupported), null);
+		assert.equal(findUnsupportedCname({ records: { A: ['1.2.3.4'] } }, unsupported), null);
+		assert.equal(findUnsupportedCname({ records: { CNAME: 'vercel.app' } }, []), null);
+	});
+
+	test('list entries written as ".tld" match that whole TLD', () => {
+		const tlds = ['.tk', '.blob.core.windows.net', '*.workers.dev'];
+
+		assert.equal(findUnsupportedCname({ records: { CNAME: 'site.tk' } }, tlds), 'site.tk');
+		assert.equal(
+			findUnsupportedCname({ records: { CNAME: 'a.blob.core.windows.net' } }, tlds),
+			'a.blob.core.windows.net'
+		);
+		assert.equal(
+			findUnsupportedCname({ records: { CNAME: 'me.workers.dev' } }, tlds),
+			'me.workers.dev'
+		);
+		assert.equal(findUnsupportedCname({ records: { CNAME: 'site.tkx' } }, tlds), null);
+	});
+
+	test('finds the CNAME line', () => {
+		assert.equal(findCnameLine('{\n  "records": {\n    "CNAME": "x.vercel.app"\n  }\n}'), 3);
 	});
 });
 

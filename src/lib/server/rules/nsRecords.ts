@@ -35,6 +35,7 @@ export function findNsRecords(json: unknown): string[] {
 export const nsRecordsRule: Rule = {
 	id: 'nsRecords',
 	title: 'NS records from a first-time contributor',
+	severity: 3,
 	actionType: 'closePr',
 	actionLabel: 'Close PR',
 

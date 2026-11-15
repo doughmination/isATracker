@@ -2,7 +2,7 @@
  * MIT — (c) Doughmination System®
  */
 
-export type RuleId = 'nsRecords' | 'noReplyEmail';
+export type RuleId = 'nsRecords' | 'unsupportedCname' | 'noReplyEmail';
 
 export type ActionType = 'closePr' | 'requestChanges' | 'ignore';
 

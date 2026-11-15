@@ -10,8 +10,10 @@ import {
 	type BaseMessageOptions
 } from 'discord.js';
 
+import { severityLabels } from '../../labels.ts';
 import { getConfig } from '../config.ts';
-import { getRule } from '../rules/index.ts';
+import { listFindingsForPullRequest } from '../db/findings.ts';
+import { bySeverity, getRule } from '../rules/index.ts';
 import type { FindingStatus, FindingWithPullRequest } from '../types.ts';
 
 export const buttonPrefix = 'tracker';
@@ -42,6 +44,21 @@ export function buildButtonId(decision: 'approve' | 'ignore', findingId: number)
 	return `${buttonPrefix}:${decision}:${findingId}`;
 }
 
+// Other open violations on the same PR, most serious first
+function describeOtherFindings(finding: FindingWithPullRequest): string {
+	const others = listFindingsForPullRequest(finding.prNumber)
+		.filter(
+			(other) =>
+				other.id !== finding.id && (other.status === 'pending' || other.status === 'acting')
+		)
+		.sort(bySeverity)
+		.map(
+			(other) => `${severityLabels[getRule(other.ruleId).severity]}: ${getRule(other.ruleId).title}`
+		);
+
+	return others.length === 0 ? 'None' : others.join('\n');
+}
+
 export function renderFinding(finding: FindingWithPullRequest): BaseMessageOptions {
 	const rule = getRule(finding.ruleId);
 
@@ -53,6 +70,16 @@ export function renderFinding(finding: FindingWithPullRequest): BaseMessageOptio
 			{
 				name: 'Violation',
 				value: rule.title
+			},
+			{
+				name: 'Severity',
+				value: severityLabels[rule.severity],
+				inline: true
+			},
+			{
+				name: 'Also on this PR',
+				value: truncate(describeOtherFindings(finding), 1000),
+				inline: true
 			},
 			{
 				name: 'Author',

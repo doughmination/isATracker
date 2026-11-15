@@ -24,6 +24,10 @@ export function getMessages(): ModerationMessages {
 				...defaultMessages.nsRecords,
 				...overrides.nsRecords
 			},
+			unsupportedCname: {
+				...defaultMessages.unsupportedCname,
+				...overrides.unsupportedCname
+			},
 			noReplyEmail: {
 				...defaultMessages.noReplyEmail,
 				...overrides.noReplyEmail

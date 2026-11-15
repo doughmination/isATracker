@@ -9,6 +9,7 @@ import { getFinding, listUnnotifiedFindings, setFindingDiscordMessage } from '..
 import { onFindingEvent } from '../events.ts';
 import { createLogger, sleep } from '../logger.ts';
 import { performModerationAction, type ModerationDecision } from '../moderation/actions.ts';
+import { bySeverity } from '../rules/index.ts';
 import { buttonPrefix, renderFinding } from './render.ts';
 
 const logger = createLogger('discord');
@@ -96,7 +97,7 @@ export async function flushNotifications(): Promise<void> {
 		return;
 	}
 
-	for (const finding of listUnnotifiedFindings()) {
+	for (const finding of listUnnotifiedFindings().sort(bySeverity)) {
 		await sendNotification(finding.id);
 	}
 }

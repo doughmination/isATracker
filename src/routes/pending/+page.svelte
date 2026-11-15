@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { formatTimestamp, labelFor, ruleLabels } from '#lib/labels.ts';
+	import { formatTimestamp, labelFor, ruleLabels, severityLabels } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
 
@@ -53,6 +53,14 @@
 		<dl>
 			<dt>Violation</dt>
 			<dd>{labelFor(ruleLabels, finding.ruleId)}</dd>
+
+			<dt>Severity</dt>
+			<dd>{severityLabels[finding.severity]}</dd>
+
+			{#if finding.otherRuleIds.length > 0}
+				<dt>Also on this PR</dt>
+				<dd>{finding.otherRuleIds.map((ruleId) => labelFor(ruleLabels, ruleId)).join(', ')}</dd>
+			{/if}
 
 			<dt>Author</dt>
 			<dd>{finding.author}</dd>

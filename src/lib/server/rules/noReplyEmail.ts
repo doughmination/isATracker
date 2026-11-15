@@ -34,8 +34,15 @@ export function findOwnerEmailLine(content: string, email: string): number | nul
 export const noReplyEmailRule: Rule = {
 	id: 'noReplyEmail',
 	title: 'GitHub no-reply owner.email',
+	severity: 1,
 	actionType: 'requestChanges',
 	actionLabel: 'Request Changes',
+
+	findLine(file) {
+		const email = findNoReplyEmail(file.json);
+
+		return email === null ? null : findOwnerEmailLine(file.content, email);
+	},
 
 	async evaluate(context) {
 		const violations: Violation[] = [];

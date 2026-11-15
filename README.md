@@ -54,6 +54,18 @@ done, and nothing is sent to GitHub.
 
 Edit `config/messages.json`. Changes apply on the next action, with no restart.
 
+## Unsupported CNAME targets
+
+List hosts in `config/unsupportedCnames.json` as a JSON array, for example
+`["vercel.app", "example.com"]`. A CNAME matches an entry or any subdomain of it.
+Changes apply on the next scan. An empty list turns the rule off.
+
+## Severity
+
+When a PR breaks several rules, the most serious leads: NS (High), then CNAME (Medium),
+then no-reply email (Low). Discord and the pending page show each finding's severity and
+the other open violations on the same PR.
+
 ## How it stays safe
 
 - Every action revalidates the PR at its latest commit first.
@@ -66,7 +78,9 @@ Edit `config/messages.json`. Changes apply on the next action, with no restart.
 
 1. Add a module in `src/lib/server/rules/` that exports a `Rule`.
 2. Register it in `src/lib/server/rules/index.ts`.
-3. If it needs a new kind of action, add an executor in `src/lib/server/moderation/executors.ts`.
+3. Give it a `severity` from 1 (low) to 3 (high).
+4. A `requestChanges` rule needs a `findLine` and wording in `config/messages.json`.
+5. If it needs a new kind of action, add an executor in `src/lib/server/moderation/executors.ts`.
 
 ## Checks
 
