@@ -2,19 +2,23 @@
  * MIT — (c) Doughmination System®
  */
 
-import { setFindingComment } from '../db/findings.ts';
+import { getConfig } from '../config.ts';
+import { listFindingsForPullRequest, setFindingComment, setFindingStatus } from '../db/findings.ts';
 import { markPullRequestClosed } from '../db/pullRequests.ts';
+import { emitFindingEvent } from '../events.ts';
 import { getCommentableLines } from '../github/diff.ts';
 import { GitHubError } from '../github/client.ts';
 import {
 	closePullRequest,
 	createChangesRequestedReview,
 	createIssueComment,
+	dismissReview,
 	getAuthenticatedLogin,
 	listReviews
 } from '../github/pullRequests.ts';
 import { getMessages } from '../messages.ts';
 import { getRule } from '../rules/index.ts';
+import type { Violation } from '../rules/types.ts';
 import type { ActionOutcome, ActionType, FindingRow, PullRequestSummary } from '../types.ts';
 import type { Evaluation } from './evaluate.ts';
 import { retireFindings } from './reconcile.ts';
@@ -138,6 +142,51 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 		summary: `Requested changes on #${pullRequest.number} in the review body (line not commentable).`,
 		githubUrl: review.html_url
 	};
+}
+
+// Dismisses our change requests once the latest commit no longer has the violation
+export async function dismissFixedChangeRequests(
+	pullRequest: PullRequestSummary,
+	violations: Violation[]
+): Promise<void> {
+	const fixed = listFindingsForPullRequest(pullRequest.number).filter(
+		(finding) =>
+			finding.status === 'actioned' &&
+			getRule(finding.ruleId).actionType === 'requestChanges' &&
+			!violations.some(
+				(violation) =>
+					violation.ruleId === finding.ruleId && violation.filePath === finding.filePath
+			)
+	);
+
+	if (fixed.length === 0 || getConfig().dryRun) {
+		return;
+	}
+
+	const login = await getAuthenticatedLogin();
+	const reviews = await listReviews(pullRequest.number);
+
+	for (const finding of fixed) {
+		const marker = reviewMarker(finding);
+
+		const openReviews = reviews.filter(
+			(review) =>
+				review.user?.login === login &&
+				review.state === 'CHANGES_REQUESTED' &&
+				(review.body ?? '').includes(marker)
+		);
+
+		for (const review of openReviews) {
+			await dismissReview(pullRequest.number, review.id, reviewMessages(finding).reviewDismissal);
+		}
+
+		setFindingStatus(
+			finding.id,
+			'resolved',
+			'The contributor fixed this; the requested changes were dismissed.'
+		);
+		emitFindingEvent('findingChanged', finding.id);
+	}
 }
 
 export const executors: Record<Exclude<ActionType, 'ignore'>, Executor> = {

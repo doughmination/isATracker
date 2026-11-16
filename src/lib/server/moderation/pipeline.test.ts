@@ -32,6 +32,7 @@ interface RecordedWrite {
 	body: {
 		state?: string;
 		event?: string;
+		body?: string;
 		commit_id?: string;
 		comments?: {
 			path: string;
@@ -156,7 +157,22 @@ async function fakeGitHub(input: string | URL | Request, init?: RequestInit): Pr
 	}
 
 	if (pullRequest && path.endsWith('/reviews')) {
-		return jsonResponse([]);
+		const reviews = writes
+			.map((write, index) => ({
+				write,
+				id: index + 1
+			}))
+			.filter(({ write }) => write.method === 'POST' && write.path === path)
+			.map(({ write, id }) => ({
+				id,
+				state: 'CHANGES_REQUESTED',
+				body: write.body.body ?? null,
+				commit_id: write.body.commit_id,
+				html_url: `https://github.com/fake/${id}`,
+				user: { login: 'moderator' }
+			}));
+
+		return jsonResponse(reviews);
 	}
 
 	if (pullRequest) {
@@ -299,6 +315,27 @@ describe('moderation pipeline', () => {
 		assert.equal(comment.line, 4);
 		assert.ok(comment.body.includes('GitHub no-reply email address'));
 		assert.equal(fakePullRequests.get(2)?.state, 'open');
+	});
+
+	test('fixing a change request dismisses the review once', async () => {
+		const pullRequest = fakePullRequests.get(2)!;
+
+		pullRequest.sha = 'sha-two-fixed';
+		pullRequest.updatedAt = '2026-11-01T12:00:00Z';
+		pullRequest.json = {
+			owner: { username: 'hidden' },
+			records: { CNAME: 'hidden.github.io' }
+		};
+
+		await scanOnce();
+		await scanOnce();
+
+		const dismissals = writes.filter((write) => write.method === 'PUT');
+
+		assert.equal(dismissals.length, 1);
+		assert.equal(dismissals[0].path, '/pulls/2/reviews/3/dismissals');
+		assert.equal(dismissals[0].body.event, 'DISMISS');
+		assert.equal(findingFor(2).status, 'resolved');
 	});
 
 	test('a fix pushed by the contributor resolves the finding', async () => {

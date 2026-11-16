@@ -213,6 +213,22 @@ export async function listReviews(number: number): Promise<ApiReview[]> {
 	return response.data;
 }
 
+export async function dismissReview(
+	number: number,
+	reviewId: number,
+	message: string
+): Promise<void> {
+	await githubRequest({
+		method: 'PUT',
+		path: `${getRepoPath()}/pulls/${number}/reviews/${reviewId}/dismissals`,
+		body: {
+			message,
+			event: 'DISMISS'
+		},
+		priority: true
+	});
+}
+
 export async function createChangesRequestedReview(options: {
 	number: number;
 	commitId: string;

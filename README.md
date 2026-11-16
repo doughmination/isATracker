@@ -54,6 +54,9 @@ done, and nothing is sent to GitHub.
 
 Edit `config/messages.json`. Changes apply on the next action, with no restart.
 
+Once a contributor fixes a change request, the next scan dismisses that review with the rule's
+`reviewDismissal` wording and marks the finding resolved.
+
 ## Unsupported CNAME targets
 
 List hosts in `config/unsupportedCnames.json` as a JSON array, for example
@@ -92,7 +95,8 @@ the other open violations on the same PR.
 1. Add a module in `src/lib/server/rules/` that exports a `Rule`.
 2. Register it in `src/lib/server/rules/index.ts`.
 3. Give it a `severity` from 1 (low) to 3 (high).
-4. A `requestChanges` rule needs a `findLine` and wording in `config/messages.json`.
+4. A `requestChanges` rule needs a `findLine` and wording in `config/messages.json`
+   (`reviewComment`, `reviewSummary` and `reviewDismissal`).
 5. If it needs a new kind of action, add an executor in `src/lib/server/moderation/executors.ts`.
 
 ## Checks

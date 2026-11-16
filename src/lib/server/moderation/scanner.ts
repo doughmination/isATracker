@@ -14,6 +14,7 @@ import { listPullRequests } from '../github/pullRequests.ts';
 import { createLogger, describeError } from '../logger.ts';
 import type { PullRequestSummary } from '../types.ts';
 import { evaluatePullRequest } from './evaluate.ts';
+import { dismissFixedChangeRequests } from './executors.ts';
 import { reconcileFindings, retireFindings } from './reconcile.ts';
 
 const logger = createLogger('scanner');
@@ -100,6 +101,7 @@ async function processPullRequest(pullRequest: PullRequestSummary): Promise<void
 		priority: false
 	});
 
+	await dismissFixedChangeRequests(pullRequest, evaluation.violations);
 	reconcileFindings(pullRequest, evaluation.violations);
 	markPullRequestScanned(pullRequest.number, pullRequest.headSha);
 

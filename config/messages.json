@@ -4,10 +4,12 @@
 	},
 	"unsupportedCname": {
 		"reviewComment": "Your `CNAME` record points at a host that we do not support. Please point it at a supported host, or use another record type such as `A` or `AAAA`.\n\nIf you have requested a CloudFlare Worker, please use a legacy CloudFlare Pages project.",
+		"reviewDismissal": "Thanks, the `CNAME` record is fixed. Dismissing the requested changes.",
 		"reviewSummary": "Please see the inline comment on `CNAME`.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 	},
 	"noReplyEmail": {
 		"reviewComment": "Your `owner.email` value is a GitHub no-reply email address. We do not allow these on our service. Please update it to a personal email address or remove the `owner.email` field entirely, as it is optional.",
+		"reviewDismissal": "Thanks, `owner.email` is fixed. Dismissing the requested changes.",
 		"reviewSummary": "Please see the inline comment on `owner.email`.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 	}
 }

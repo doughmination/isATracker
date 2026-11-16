@@ -39,7 +39,7 @@ const rateBuckets = new Map<string, RateBucket>();
 let blockedUntil = 0;
 
 export interface GitHubRequest {
-	method?: 'GET' | 'POST' | 'PATCH';
+	method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
 	path: string;
 	query?: Record<string, string | number>;
 	body?: unknown;
