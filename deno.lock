@@ -11,6 +11,7 @@
     "npm:eslint-plugin-svelte@^3.19.0": "3.24.1_eslint@10.14.0_svelte@5.57.3",
     "npm:eslint@^10.4.1": "10.14.0",
     "npm:globals@^17.6.0": "17.14.0",
+    "npm:jpcl-lang@^1.1.1": "1.1.1",
     "npm:prettier-plugin-svelte@^4.1.0": "4.1.1_prettier@3.10.0_svelte@5.57.3",
     "npm:prettier@^3.8.3": "3.10.0",
     "npm:svelte-check@^4.6.0": "4.7.8_svelte@5.57.3_typescript@6.0.3",
@@ -851,6 +852,10 @@
     "isexe@2.0.0": {
       "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="
     },
+    "jpcl-lang@1.1.1": {
+      "integrity": "sha512-WyED4bjuNuWr+oKi0+3iIY2EinGk/VsZj4AP4XY8PrvPhzCL3aSBJSZcZ5pDz2Myf+JW8AN5omEIjSyjGMupIQ==",
+      "bin": true
+    },
     "json-schema-traverse@0.4.1": {
       "integrity": "sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg=="
     },
@@ -1067,8 +1072,7 @@
       "integrity": "sha512-Khh/tERVBn0I1499dvBSHY0pWJloMJWUxDsOBM0CCDPAcVZ10Jl2L1qy1f19uEX22spa8Mv7DCdEQJc0cGwBhQ==",
       "dependencies": [
         "util-deprecate"
-      ],
-      "deprecated": true
+      ]
     },
     "postcss@8.5.32": {
       "integrity": "sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==",
@@ -1331,6 +1335,7 @@
         "npm:eslint-plugin-svelte@^3.19.0",
         "npm:eslint@^10.4.1",
         "npm:globals@^17.6.0",
+        "npm:jpcl-lang@^1.1.1",
         "npm:prettier-plugin-svelte@^4.1.0",
         "npm:prettier@^3.8.3",
         "npm:svelte-check@^4.6.0",

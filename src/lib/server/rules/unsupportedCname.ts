@@ -3,6 +3,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { loads } from 'jpcl-lang';
 
 import { getConfig } from '../config.ts';
 import { createLogger } from '../logger.ts';
@@ -23,10 +24,11 @@ function normaliseHost(host: string): string {
 // Read on every scan, so list edits apply without a restart
 export function getUnsupportedCnames(): string[] {
 	try {
-		const list: unknown = JSON.parse(readFileSync(getConfig().unsupportedCnamesPath, 'utf8'));
+		const file = loads(readFileSync(getConfig().unsupportedCnamesPath, 'utf8'));
+		const list: unknown = file.hosts;
 
 		if (!Array.isArray(list)) {
-			throw new Error('expected a JSON array of hostnames');
+			throw new Error('expected a "hosts" array of hostnames');
 		}
 
 		return list.filter(

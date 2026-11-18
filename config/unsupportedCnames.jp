@@ -1,0 +1,21 @@
+# config/unsupportedCnames.jp
+# A CNAME matches an entry or any subdomain of it
+
+hosts: [
+  ".adult",
+  ".blob.core.windows.net",
+  ".cf",
+  ".cfargotunnel.com",
+  ".ga",
+  ".gq",
+  ".ml",
+  ".porn",
+  ".r2.dev",
+  ".sex",
+  ".sexy",
+  ".trycloudflare.com",
+  ".tk",
+  ".workers.dev",
+  ".xxx",
+  ".ts.net"
+]

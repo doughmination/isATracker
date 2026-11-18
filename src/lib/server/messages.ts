@@ -3,19 +3,44 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { loads } from 'jpcl-lang';
 
-import defaultMessages from '../../../config/messages.json' with { type: 'json' };
 import { getConfig } from './config.ts';
 import { createLogger } from './logger.ts';
 
 const logger = createLogger('messages');
 
-export type ModerationMessages = typeof defaultMessages;
+export type ModerationMessages = {
+	nsRecords: {
+		closeComment: string;
+	};
+	unsupportedCname: {
+		reviewComment: string;
+		reviewDismissal: string;
+		reviewSummary: string;
+	};
+	noReplyEmail: {
+		reviewComment: string;
+		reviewDismissal: string;
+		reviewSummary: string;
+	};
+};
+
+// The committed file, read once, so a later bad edit still has wording to fall back on
+let defaultMessages: ModerationMessages | null = null;
+
+function getDefaultMessages(): ModerationMessages {
+	defaultMessages ??= loads(readFileSync('config/messages.jp', 'utf8')) as ModerationMessages;
+
+	return defaultMessages;
+}
 
 // Read on every use, so wording edits apply without a restart
 export function getMessages(): ModerationMessages {
+	const defaultMessages = getDefaultMessages();
+
 	try {
-		const overrides = JSON.parse(
+		const overrides = loads(
 			readFileSync(getConfig().messagesPath, 'utf8')
 		) as Partial<ModerationMessages>;
 
