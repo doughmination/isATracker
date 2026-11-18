@@ -3,6 +3,7 @@
  */
 
 import { getConfig } from '../config.ts';
+import { listFindingsForPullRequest } from '../db/findings.ts';
 import { deleteValue, getValue, setValue } from '../db/keyValue.ts';
 import {
 	getPullRequestRow,
@@ -92,7 +93,12 @@ async function processPullRequest(pullRequest: PullRequestSummary): Promise<void
 	const alreadyScanned =
 		previous !== null && previous.state === 'open' && previous.scannedSha === pullRequest.headSha;
 
-	if (alreadyScanned) {
+	// A fix can land without a commit (an edited description, a Vercel setting), so flagged PRs are rechecked on any update
+	const hasOpenFindings = listFindingsForPullRequest(pullRequest.number).some(
+		(finding) => finding.status === 'pending' || finding.status === 'actioned'
+	);
+
+	if (alreadyScanned && !hasOpenFindings) {
 		return;
 	}
 

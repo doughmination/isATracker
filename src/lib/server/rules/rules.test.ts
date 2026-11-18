@@ -9,6 +9,7 @@ import { getCommentableLines } from '../github/diff.ts';
 import { findNoReplyEmail, findOwnerEmailLine } from './noReplyEmail.ts';
 import { findNsRecords } from './nsRecords.ts';
 import { findCnameLine, findUnsupportedCname } from './unsupportedCname.ts';
+import { findVercelLinks, redirectsToVercelLogin } from './vercelLogin.ts';
 
 describe('findNsRecords', () => {
 	test('finds NS records under "records"', () => {
@@ -145,5 +146,76 @@ describe('review line placement', () => {
 
 		assert.deepEqual([...getCommentableLines(patch)], [10, 11, 12]);
 		assert.equal(getCommentableLines(undefined).size, 0);
+	});
+});
+
+describe('findVercelLinks', () => {
+	const template = [
+		'<!-- This should be a LINK (e.g. https://abc.vercel.app, https://abc.github.io) -->',
+		'',
+		'<!-- WEBSITE_PREVIEW_START -->',
+		'https://my-site.vercel.app/',
+		'<!-- WEBSITE_PREVIEW_END -->',
+		'',
+		'Also see https://other.vercel.app'
+	].join('\n');
+
+	test('reads only the preview section, ignoring the example in comments', () => {
+		assert.deepEqual(findVercelLinks(template), ['https://my-site.vercel.app/']);
+	});
+
+	test('falls back to the whole body when the markers are gone', () => {
+		assert.deepEqual(findVercelLinks('Preview: https://a.vercel.app and https://b.github.io'), [
+			'https://a.vercel.app'
+		]);
+	});
+});
+
+describe('redirectsToVercelLogin', () => {
+	const realFetch = globalThis.fetch;
+
+	function fakeRedirects(locations: Record<string, string>): string[] {
+		const requested: string[] = [];
+
+		globalThis.fetch = (async (input: string | URL | Request) => {
+			const url = String(input);
+			const location = locations[url];
+
+			requested.push(url);
+
+			return new Response(null, {
+				status: location ? 302 : 200,
+				headers: location ? { location } : {}
+			});
+		}) as typeof fetch;
+
+		return requested;
+	}
+
+	test('follows the Vercel Authentication chain to the login page', async () => {
+		fakeRedirects({
+			'https://locked.vercel.app/': 'https://vercel.com/sso-api?url=x',
+			'https://vercel.com/sso-api?url=x': '/login?next=%2Fsso-api'
+		});
+
+		assert.equal(await redirectsToVercelLogin('https://locked.vercel.app/'), true);
+		globalThis.fetch = realFetch;
+	});
+
+	test('a public preview is not flagged', async () => {
+		fakeRedirects({});
+
+		assert.equal(await redirectsToVercelLogin('https://open.vercel.app/'), false);
+		globalThis.fetch = realFetch;
+	});
+
+	test('never follows a redirect off Vercel', async () => {
+		const requested = fakeRedirects({
+			'https://sneaky.vercel.app/': 'http://127.0.0.1:3101/login'
+		});
+
+		assert.equal(await redirectsToVercelLogin('https://sneaky.vercel.app/'), false);
+		assert.deepEqual(requested, ['https://sneaky.vercel.app/']);
+		globalThis.fetch = realFetch;
 	});
 });

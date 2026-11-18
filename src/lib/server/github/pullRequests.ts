@@ -16,6 +16,7 @@ interface ApiPullRequest {
 	author_association: string;
 	user: { login: string } | null;
 	head: { sha: string };
+	body: string | null;
 }
 
 export interface PullRequestFile {
@@ -49,7 +50,8 @@ function toSummary(pullRequest: ApiPullRequest): PullRequestSummary {
 		url: pullRequest.html_url,
 		state: pullRequest.state,
 		headSha: pullRequest.head.sha,
-		updatedAt: pullRequest.updated_at
+		updatedAt: pullRequest.updated_at,
+		body: pullRequest.body ?? ''
 	};
 }
 

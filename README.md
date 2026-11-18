@@ -63,6 +63,14 @@ List hosts in `config/unsupportedCnames.jp` under `hosts`, for example
 `hosts: ["vercel.app", "example.com"]`. A CNAME matches an entry or any subdomain of it.
 Changes apply on the next scan. An empty list turns the rule off.
 
+## Vercel previews behind a login
+
+If the PR's website preview is a `vercel.app` link that redirects to `https://vercel.com/login`,
+the tracker flags it. Approving it requests changes with the steps to turn off Vercel
+Authentication. Redirects are only followed between Vercel's own hosts, and a link that cannot
+be reached is never flagged. A PR with an open finding is rechecked whenever it updates, so the
+review is dismissed once the preview loads, even without a new commit.
+
 ## Avatar
 
 `config/avatar.png` is the dashboard favicon and the Discord bot's avatar. Replace the file to
@@ -95,8 +103,9 @@ the other open violations on the same PR.
 1. Add a module in `src/lib/server/rules/` that exports a `Rule`.
 2. Register it in `src/lib/server/rules/index.ts`.
 3. Give it a `severity` from 1 (low) to 3 (high).
-4. A `requestChanges` rule needs a `findLine` and wording in `config/messages.jp`
-   (`reviewComment`, `reviewSummary` and `reviewDismissal`).
+4. A `requestChanges` rule needs wording in `config/messages.jp`
+   (`reviewComment`, `reviewSummary` and `reviewDismissal`). Give it a `findLine` to comment
+   inline; without one, the review body is `reviewComment` alone.
 5. If it needs a new kind of action, add an executor in `src/lib/server/moderation/executors.ts`.
 
 ## Checks

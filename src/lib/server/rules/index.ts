@@ -7,9 +7,15 @@ import { noReplyEmailRule } from './noReplyEmail.ts';
 import { nsRecordsRule } from './nsRecords.ts';
 import type { Rule } from './types.ts';
 import { unsupportedCnameRule } from './unsupportedCname.ts';
+import { vercelLoginRule } from './vercelLogin.ts';
 
 // Add a new rule module here and the scanner, Discord and dashboard all pick it up
-export const rules: Rule[] = [nsRecordsRule, unsupportedCnameRule, noReplyEmailRule];
+export const rules: Rule[] = [
+	nsRecordsRule,
+	unsupportedCnameRule,
+	vercelLoginRule,
+	noReplyEmailRule
+];
 
 export function getRule(ruleId: RuleId): Rule {
 	const rule = rules.find((candidate) => candidate.id === ruleId);

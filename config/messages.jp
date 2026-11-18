@@ -12,3 +12,8 @@ reviewSummary: "Please see the inline comment on `CNAME`.\n<sub>This comment was
 reviewComment: "Your `owner.email` value is a GitHub no-reply email address. We do not allow these on our service. Please update it to a personal email address or remove the `owner.email` field entirely, as it is optional."
 reviewDismissal: "Thanks, `owner.email` is fixed. Dismissing the requested changes."
 reviewSummary: "Please see the inline comment on `owner.email`.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
+
+[vercelLogin]
+reviewComment: "Your website preview is not live: it redirects to the Vercel login page, so we cannot review it.\n\nTo make it public:\n\n1. Open your project dashboard on Vercel.\n2. Navigate to **Settings > Deployment Protection**.\n3. Toggle off **Vercel Authentication** (Require Login) and click **Save**.\n4. Test your link in an Incognito window to confirm it loads without a login prompt.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
+reviewDismissal: "Thanks, your website preview now loads without a login. Dismissing the requested changes."
+reviewSummary: "Please see the comment on your website preview.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"

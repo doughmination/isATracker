@@ -2,7 +2,7 @@
  * MIT — (c) Doughmination System®
  */
 
-export type RuleId = 'nsRecords' | 'unsupportedCname' | 'noReplyEmail';
+export type RuleId = 'nsRecords' | 'unsupportedCname' | 'noReplyEmail' | 'vercelLogin';
 
 export type ActionType = 'closePr' | 'requestChanges' | 'ignore';
 
@@ -21,9 +21,11 @@ export interface PullRequestSummary {
 	state: 'open' | 'closed';
 	headSha: string;
 	updatedAt: string;
+	// The PR description; not stored in the database
+	body: string;
 }
 
-export interface PullRequestRow extends PullRequestSummary {
+export interface PullRequestRow extends Omit<PullRequestSummary, 'body'> {
 	scannedSha: string | null;
 	scannedAt: string | null;
 }

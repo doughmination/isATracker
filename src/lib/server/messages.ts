@@ -24,6 +24,11 @@ export type ModerationMessages = {
 		reviewDismissal: string;
 		reviewSummary: string;
 	};
+	vercelLogin: {
+		reviewComment: string;
+		reviewDismissal: string;
+		reviewSummary: string;
+	};
 };
 
 // The committed file, read once, so a later bad edit still has wording to fall back on
@@ -56,6 +61,10 @@ export function getMessages(): ModerationMessages {
 			noReplyEmail: {
 				...defaultMessages.noReplyEmail,
 				...overrides.noReplyEmail
+			},
+			vercelLogin: {
+				...defaultMessages.vercelLogin,
+				...overrides.vercelLogin
 			}
 		};
 	} catch (error) {

@@ -99,7 +99,9 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 	const line = file && findLine ? findLine(file) : null;
 	const canCommentInline = line !== null && getCommentableLines(file?.patch).has(line);
 
-	const fallbackBody = `${messages.reviewComment}\n\nFile: \`${finding.filePath}\`\n\n${marker}`;
+	// Rules without a line (like vercelLogin) are about the PR, not a file
+	const fileNote = findLine ? `\n\nFile: \`${finding.filePath}\`` : '';
+	const fallbackBody = `${messages.reviewComment}${fileNote}\n\n${marker}`;
 
 	if (canCommentInline) {
 		try {
