@@ -17,7 +17,9 @@ export HOME=/home/clove
 # ORIGIN must be the dashboard's public URL: SvelteKit needs it for form actions (CSRF check)
 
 # Reads are limited to this folder; writes are limited to data/, where the SQLite file lives
+# --watch restarts on a new build; deploy/hooks/post-merge rebuilds after every git pull
 exec chpst -u clove /usr/bin/deno run \
+	--watch=build/ \
 	--allow-net \
 	--allow-env \
 	--allow-read=. \

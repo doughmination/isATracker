@@ -1,0 +1,9 @@
+#!/bin/sh
+# deploy/hooks/post-merge
+# MIT — (c) Doughmination System®
+
+# Rebuild after a pull; deploy/run's --watch then restarts the service on the new build.
+# Enable once with: git config core.hooksPath deploy/hooks
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+deno install && deno task build

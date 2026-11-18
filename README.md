@@ -127,3 +127,16 @@ The server folder needs `build/`, `node_modules/`, `config/`, `package.json` and
 It also needs a `data/` folder that `clove` can write to; the SQLite file lives there.
 
 Set `ORIGIN` in the server's `.env` to the dashboard's public address.
+
+### Updating
+
+Run this once in `/srv/clove/isATracker`, so every `git pull` rebuilds the app:
+
+```sh
+git config core.hooksPath deploy/hooks
+```
+
+After that, `git pull` is the whole deploy. The hook installs dependencies and runs the build,
+and `deno run --watch` restarts the service when `build/` changes. The dashboard is down for
+the few seconds the build takes to write `build/`. A build that fails to compile leaves the old
+one running.
