@@ -16,7 +16,7 @@ export const load: LayoutServerLoad = ({ url }) => {
 		dryRun: getConfig().dryRun,
 		repos: getConfig().repos,
 		repoFilter,
-		pendingTotal: onLoginPage ? 0 : listOpenFindings(repoFilter).length,
+		pendingTotal: onLoginPage ? 0 : listOpenFindings().length,
 		showNavigation: !onLoginPage,
 		canSignOut: isPasswordConfigured()
 	};

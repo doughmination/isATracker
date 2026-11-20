@@ -6,7 +6,6 @@
 	import '../app.css';
 
 	import { page } from '$app/state';
-	import { repoLabel } from '#lib/labels.ts';
 	// Same file the Discord bot uses as its avatar
 	import favicon from '../../config/avatar.png';
 
@@ -32,35 +31,6 @@
 			label: 'Lookup'
 		}
 	];
-
-	// Same page, with the repository filter set (or cleared for null)
-	function filterHref(repo: string | null): string {
-		const next = new URL(page.url.href);
-
-		if (repo === null) {
-			next.searchParams.delete('repo');
-		} else {
-			next.searchParams.set('repo', repo);
-		}
-
-		return `${next.pathname}${next.search}`;
-	}
-
-	// Page links keep the current filter
-	const filterQuery = $derived(
-		data.repoFilter ? `?repo=${encodeURIComponent(data.repoFilter)}` : ''
-	);
-
-	const filterOptions = $derived([
-		{
-			repo: null,
-			label: 'All'
-		},
-		...data.repos.map((repo) => ({
-			repo,
-			label: repoLabel(repo)
-		}))
-	]);
 </script>
 
 <svelte:head>
@@ -73,10 +43,7 @@
 			<strong>is-a-tracker</strong>
 
 			{#each links as link (link.href)}
-				<a
-					href={`${link.href}${filterQuery}`}
-					aria-current={page.url.pathname === link.href ? 'page' : undefined}
-				>
+				<a href={link.href} aria-current={page.url.pathname === link.href ? 'page' : undefined}>
 					{link.label}
 					{#if link.href === '/pending' && data.pendingTotal > 0}
 						<span class="count">{data.pendingTotal}</span>
@@ -85,18 +52,6 @@
 			{/each}
 
 			<span class="spacer"></span>
-
-			<span class="filter" role="group" aria-label="Repository filter">
-				{#each filterOptions as option (option.label)}
-					<a
-						href={filterHref(option.repo)}
-						title={option.repo ?? 'Every repository'}
-						aria-current={data.repoFilter === option.repo ? 'true' : undefined}
-					>
-						{option.label}
-					</a>
-				{/each}
-			</span>
 
 			{#if data.dryRun}
 				<span class="pill" title="Buttons will not change anything on GitHub">Dry run ON</span>
@@ -153,23 +108,5 @@
 
 	.spacer {
 		flex: 1;
-	}
-
-	.filter {
-		display: inline-flex;
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		overflow: hidden;
-	}
-
-	.filter a {
-		padding: 0.15rem 0.7rem;
-		border-bottom: none;
-		font-size: 0.9rem;
-	}
-
-	.filter a[aria-current='true'] {
-		background: var(--accent);
-		color: var(--accent-text);
 	}
 </style>

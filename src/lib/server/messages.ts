@@ -10,32 +10,34 @@ import { createLogger } from './logger.ts';
 
 const logger = createLogger('messages');
 
+export interface ReviewMessages {
+	reviewComment: string;
+	reviewDismissal: string;
+	reviewSummary: string;
+}
+
 export type ModerationMessages = {
 	nsRecords: {
 		closeComment: string;
 	};
-	unsupportedCname: {
-		reviewComment: string;
-		reviewDismissal: string;
+	// Used when one review covers several violations
+	combined: {
 		reviewSummary: string;
 	};
-	noReplyEmail: {
-		reviewComment: string;
-		reviewDismissal: string;
-		reviewSummary: string;
-	};
-	vercelLogin: {
-		reviewComment: string;
-		reviewDismissal: string;
-		reviewSummary: string;
-	};
+	unsupportedCname: ReviewMessages;
+	noReplyEmail: ReviewMessages;
+	vercelLogin: ReviewMessages;
+	vercelFileName: ReviewMessages;
+	vercelTxtRecord: ReviewMessages;
 };
 
 // The committed file, read once, so a later bad edit still has wording to fall back on
 let defaultMessages: ModerationMessages | null = null;
 
 function getDefaultMessages(): ModerationMessages {
-	defaultMessages ??= loads(readFileSync('config/messages.jp', 'utf8')) as ModerationMessages;
+	defaultMessages ??= loads(
+		readFileSync('config/messages.jp', 'utf8')
+	) as unknown as ModerationMessages;
 
 	return defaultMessages;
 }
@@ -49,24 +51,17 @@ export function getMessages(): ModerationMessages {
 			readFileSync(getConfig().messagesPath, 'utf8')
 		) as Partial<ModerationMessages>;
 
-		return {
-			nsRecords: {
-				...defaultMessages.nsRecords,
-				...overrides.nsRecords
-			},
-			unsupportedCname: {
-				...defaultMessages.unsupportedCname,
-				...overrides.unsupportedCname
-			},
-			noReplyEmail: {
-				...defaultMessages.noReplyEmail,
-				...overrides.noReplyEmail
-			},
-			vercelLogin: {
-				...defaultMessages.vercelLogin,
-				...overrides.vercelLogin
-			}
-		};
+		// Each section falls back key by key to the committed wording
+		const merged: Record<string, object> = {};
+
+		for (const [section, wording] of Object.entries(defaultMessages)) {
+			merged[section] = {
+				...wording,
+				...overrides[section as keyof ModerationMessages]
+			};
+		}
+
+		return merged as ModerationMessages;
 	} catch (error) {
 		logger.warn('Could not read the messages file; using built-in wording', error);
 

@@ -8,13 +8,18 @@ import { readFileSync } from 'node:fs';
 import { Client, Events, MessageFlags, type ClientUser, type Interaction } from 'discord.js';
 
 import { getConfig } from '../config.ts';
-import { getFinding, listUnnotifiedFindings, setFindingDiscordMessage } from '../db/findings.ts';
+import {
+	getFinding,
+	listFindingsForPullRequest,
+	listUnnotifiedFindings,
+	setFindingDiscordMessage
+} from '../db/findings.ts';
 import { getValue, setValue } from '../db/keyValue.ts';
 import { onFindingEvent } from '../events.ts';
 import { createLogger, sleep } from '../logger.ts';
 import { performModerationAction, type ModerationDecision } from '../moderation/actions.ts';
 import { bySeverity } from '../rules/index.ts';
-import { buttonPrefix, renderFinding } from './render.ts';
+import { buttonPrefix, messageGroup, renderPullRequest } from './render.ts';
 
 const logger = createLogger('discord');
 
@@ -24,24 +29,33 @@ function isReady(): boolean {
 	return client?.isReady() ?? false;
 }
 
-// Findings with a send in flight, so the event path and the catch-up path never double-post
-const sendsInFlight = new Set<number>();
+// PRs with a send in flight, so the event path and the catch-up path never double-post.
+// A finding skipped here is attached by the send in flight, or by the next catch-up.
+const sendsInFlight = new Set<string>();
 
 async function sendNotification(findingId: number): Promise<void> {
-	if (sendsInFlight.has(findingId)) {
+	const finding = getFinding(findingId);
+
+	if (!finding) {
 		return;
 	}
 
-	sendsInFlight.add(findingId);
+	const pullRequestKey = `${finding.repo}#${finding.prNumber}`;
+
+	if (sendsInFlight.has(pullRequestKey)) {
+		return;
+	}
+
+	sendsInFlight.add(pullRequestKey);
 
 	try {
 		await deliverNotification(findingId);
 	} finally {
-		sendsInFlight.delete(findingId);
+		sendsInFlight.delete(pullRequestKey);
 	}
 }
 
-// Sends to the configured channel when set, otherwise as a direct message
+// One message per PR: joins a live message for the PR, or sends a new one
 async function deliverNotification(findingId: number): Promise<void> {
 	const finding = getFinding(findingId);
 
@@ -53,26 +67,42 @@ async function deliverNotification(findingId: number): Promise<void> {
 		return;
 	}
 
-	const { discordChannelId, discordUserId } = getConfig();
-	const payload = renderFinding(finding);
+	const live = listFindingsForPullRequest(finding.repo, finding.prNumber).find(
+		(other) =>
+			other.discordChannelId !== null &&
+			other.discordMessageId !== null &&
+			(other.status === 'pending' || other.status === 'acting')
+	);
 
-	if (discordChannelId) {
-		const channel = await client.channels.fetch(discordChannelId);
-
-		if (!channel?.isSendable()) {
-			throw new Error(`Channel ${discordChannelId} cannot receive messages`);
-		}
-
-		const message = await channel.send(payload);
-
-		setFindingDiscordMessage(finding.id, message.channelId, message.id);
+	if (live?.discordChannelId && live.discordMessageId) {
+		setFindingDiscordMessage(finding.id, live.discordChannelId, live.discordMessageId);
+		await refreshNotification(finding.id);
 		return;
 	}
 
-	const user = await client.users.fetch(discordUserId);
-	const message = await user.send(payload);
+	// Sends to the configured channel when set, otherwise as a direct message
+	const { discordChannelId, discordUserId } = getConfig();
+	const channel = discordChannelId ? await client.channels.fetch(discordChannelId) : null;
 
-	setFindingDiscordMessage(finding.id, message.channelId, message.id);
+	if (discordChannelId && !channel?.isSendable()) {
+		throw new Error(`Channel ${discordChannelId} cannot receive messages`);
+	}
+
+	const target = channel?.isSendable() ? channel : await client.users.fetch(discordUserId);
+
+	// Rendered after the fetch, so findings from the same scan are all in it
+	const rendered = messageGroup(finding);
+	const message = await target.send(renderPullRequest(finding));
+	const unsent = messageGroup(finding);
+
+	for (const member of unsent) {
+		setFindingDiscordMessage(member.id, message.channelId, message.id);
+	}
+
+	// A finding that arrived while the message was being sent
+	if (unsent.length !== rendered.length) {
+		await refreshNotification(finding.id);
+	}
 }
 
 async function refreshNotification(findingId: number): Promise<void> {
@@ -92,7 +122,7 @@ async function refreshNotification(findingId: number): Promise<void> {
 		return;
 	}
 
-	await channel.messages.edit(finding.discordMessageId, renderFinding(finding));
+	await channel.messages.edit(finding.discordMessageId, renderPullRequest(finding));
 }
 
 // Catches up on findings that could not be delivered earlier

@@ -3,6 +3,8 @@
 -->
 
 <script lang="ts">
+	import RepoFilter from '#lib/components/RepoFilter.svelte';
+
 	import {
 		actionLabels,
 		formatTimestamp,
@@ -22,6 +24,8 @@
 </svelte:head>
 
 <h1>Moderation history</h1>
+
+<RepoFilter repos={data.repos} current={data.repoFilter} />
 
 <form method="GET" class="formRow card">
 	<input

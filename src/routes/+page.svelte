@@ -4,6 +4,7 @@
 
 <script lang="ts">
 	import ActionsChart from '#lib/components/ActionsChart.svelte';
+	import RepoFilter from '#lib/components/RepoFilter.svelte';
 	import { formatTimestamp, repoLabel } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
@@ -35,6 +36,8 @@
 </svelte:head>
 
 <h1>Overview</h1>
+
+<RepoFilter repos={data.repos} current={data.repoFilter} />
 
 <section class="tiles">
 	{#each tiles as tile (tile.label)}

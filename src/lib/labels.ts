@@ -8,7 +8,9 @@ export const ruleLabels: Record<string, string> = {
 	nsRecords: 'NS records (first-time contributor)',
 	unsupportedCname: 'Unsupported CNAME target',
 	noReplyEmail: 'No-reply owner.email',
-	vercelLogin: 'Vercel preview behind a login'
+	vercelLogin: 'Vercel preview behind a login',
+	vercelFileName: 'Misnamed _vercel file',
+	vercelTxtRecord: 'Vercel TXT in the domain file'
 };
 
 export const severityLabels: Record<number, string> = {

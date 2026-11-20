@@ -3,15 +3,28 @@
 A personal moderation assistant for pull requests on `is-a-dev/register` and
 `free-domains/is-a.bot`. Set the list in `GITHUB_REPOS` (comma separated, `owner/name`).
 
-The dashboard combines every repository. Use the **All / is-a.dev / is-a.bot** filter in the
-header to narrow any page to one repository.
+The dashboard combines every repository. Use the **All / is-a.dev / is-a.bot** filter
+on Overview, Pending and History to narrow that page to one repository. Lookup has its own
+repository picker.
 
-It detects two violations, pings you on Discord, and acts **only** when you press a button.
+It detects the violations below, pings you on Discord, and acts **only** when you press a button.
 
-| Violation                                  | Button          | What the button does                                 |
-| ------------------------------------------ | --------------- | ---------------------------------------------------- |
-| NS records from a first-time contributor   | Close PR        | Posts the policy comment, then closes the PR         |
-| `owner.email` is a GitHub no-reply address | Request Changes | Submits a review with an inline comment on that line |
+| Violation                                                | Button          | What the button does                                 |
+| -------------------------------------------------------- | --------------- | ---------------------------------------------------- |
+| NS records from a first-time contributor                 | Close PR        | Posts the policy comment, then closes the PR         |
+| `CNAME` to an unsupported host                           | Request Changes | Submits a review with an inline comment on that line |
+| Vercel preview redirects to the Vercel login             | Request Changes | Submits a review explaining Deployment Protection    |
+| `owner.email` is a GitHub no-reply address               | Request Changes | Submits a review with an inline comment on that line |
+| `_vercel.www.alice.json` instead of `_vercel.alice.json` | Request Changes | Asks for the file to be renamed to the right name    |
+| `vc-domain-verify=` TXT inside `alice.json`              | Request Changes | Asks for it to move to `_vercel.alice.json`          |
+
+Each pull request gets **one** Discord message and one dashboard card listing every issue on it,
+with one button for all of them:
+
+- With NS records on the PR, the button closes it, which settles every other issue too.
+- Otherwise it submits one review: an inline comment per issue where GitHub allows one, the
+  rest in the review body. That review is dismissed once every issue in it is fixed.
+- **Ignore** ignores every pending issue on the PR.
 
 One Deno process runs the scanner, the Discord bot, and the SvelteKit dashboard. They share one SQLite file.
 

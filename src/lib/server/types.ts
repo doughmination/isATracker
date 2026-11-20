@@ -2,7 +2,13 @@
  * MIT — (c) Doughmination System®
  */
 
-export type RuleId = 'nsRecords' | 'unsupportedCname' | 'noReplyEmail' | 'vercelLogin';
+export type RuleId =
+	| 'nsRecords'
+	| 'unsupportedCname'
+	| 'noReplyEmail'
+	| 'vercelLogin'
+	| 'vercelFileName'
+	| 'vercelTxtRecord';
 
 export type ActionType = 'closePr' | 'requestChanges' | 'ignore';
 

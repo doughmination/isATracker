@@ -14,7 +14,7 @@ import { repoLabel, severityLabels } from '../../labels.ts';
 import { getConfig } from '../config.ts';
 import { listFindingsForPullRequest } from '../db/findings.ts';
 import { bySeverity, getRule } from '../rules/index.ts';
-import type { FindingStatus, FindingWithPullRequest } from '../types.ts';
+import type { FindingRow, FindingStatus, FindingWithPullRequest } from '../types.ts';
 
 export const buttonPrefix = 'tracker';
 
@@ -44,67 +44,66 @@ export function buildButtonId(decision: 'approve' | 'ignore', findingId: number)
 	return `${buttonPrefix}:${decision}:${findingId}`;
 }
 
-// Other open violations on the same PR, most serious first
-function describeOtherFindings(finding: FindingWithPullRequest): string {
-	const others = listFindingsForPullRequest(finding.repo, finding.prNumber)
-		.filter(
-			(other) =>
-				other.id !== finding.id && (other.status === 'pending' || other.status === 'acting')
+// Findings shown in one PR message: those already on it, or the unsent pending ones
+export function messageGroup(finding: FindingWithPullRequest): FindingRow[] {
+	return listFindingsForPullRequest(finding.repo, finding.prNumber)
+		.filter((other) =>
+			finding.discordMessageId === null
+				? other.discordMessageId === null && other.status === 'pending'
+				: other.discordMessageId === finding.discordMessageId
 		)
-		.sort(bySeverity)
-		.map(
-			(other) => `${severityLabels[getRule(other.ruleId).severity]}: ${getRule(other.ruleId).title}`
-		);
-
-	return others.length === 0 ? 'None' : others.join('\n');
+		.sort(bySeverity);
 }
 
-export function renderFinding(finding: FindingWithPullRequest): BaseMessageOptions {
-	const rule = getRule(finding.ruleId);
+// The message takes the colour of its most urgent finding
+const statusPriority: FindingStatus[] = [
+	'pending',
+	'acting',
+	'actioned',
+	'resolved',
+	'prClosed',
+	'ignored'
+];
+
+export function renderPullRequest(finding: FindingWithPullRequest): BaseMessageOptions {
+	const group = messageGroup(finding);
+	const members = group.length > 0 ? group : [finding];
+	const pending = members.filter((member) => member.status === 'pending');
+
+	const leadStatus =
+		statusPriority.find((status) => members.some((member) => member.status === status)) ??
+		finding.status;
+
+	const latest = [...members].sort((first, second) =>
+		second.updatedAt.localeCompare(first.updatedAt)
+	)[0];
 
 	const embed = new EmbedBuilder()
 		.setTitle(truncate(`${repoLabel(finding.repo)} #${finding.prNumber} · ${finding.title}`, 250))
 		.setURL(finding.url)
-		.setColor(statusColours[finding.status])
-		.addFields(
-			{
-				name: 'Violation',
-				value: rule.title
-			},
-			{
-				name: 'Severity',
-				value: severityLabels[rule.severity],
-				inline: true
-			},
-			{
-				name: 'Also on this PR',
-				value: truncate(describeOtherFindings(finding), 1000),
-				inline: true
-			},
-			{
-				name: 'Author',
-				value: `[${finding.author}](https://github.com/${finding.author})`,
-				inline: true
-			},
-			{
-				name: 'File',
-				value: `\`${finding.filePath}\``,
-				inline: true
-			},
-			{
-				name: 'Reason',
-				value: truncate(finding.reason, 1000)
-			},
-			{
-				name: 'Status',
-				value: statusLabels[finding.status]
-			}
-		);
+		.setColor(statusColours[leadStatus])
+		.addFields({
+			name: 'Author',
+			value: `[${finding.author}](https://github.com/${finding.author})`
+		});
 
-	if (finding.lastOutcome) {
+	// Discord allows 25 fields; a registration PR never comes close
+	for (const member of members.slice(0, 20)) {
+		const rule = getRule(member.ruleId);
+
+		embed.addFields({
+			name: truncate(`${severityLabels[rule.severity]}: ${rule.title}`, 250),
+			value: truncate(
+				`\`${member.filePath}\`\n${member.reason}\nStatus: ${statusLabels[member.status]}`,
+				1000
+			)
+		});
+	}
+
+	if (latest.lastOutcome) {
 		embed.addFields({
 			name: 'Last result',
-			value: truncate(finding.lastOutcome, 1000)
+			value: truncate(latest.lastOutcome, 1000)
 		});
 	}
 
@@ -112,21 +111,29 @@ export function renderFinding(finding: FindingWithPullRequest): BaseMessageOptio
 		embed.setFooter({ text: 'Dry run is ON: buttons will not change anything on GitHub' });
 	}
 
-	if (finding.status !== 'pending') {
+	if (pending.length === 0) {
 		return {
 			embeds: [embed],
 			components: []
 		};
 	}
 
+	const closing = pending.find((member) => getRule(member.ruleId).actionType === 'closePr');
+	const countNote = pending.length > 1 ? ` (${pending.length})` : '';
+
+	// Either button acts on every pending finding of the PR
 	const approveButton = new ButtonBuilder()
-		.setCustomId(buildButtonId('approve', finding.id))
-		.setLabel(rule.actionLabel)
-		.setStyle(rule.actionType === 'closePr' ? ButtonStyle.Danger : ButtonStyle.Primary);
+		.setCustomId(buildButtonId('approve', pending[0].id))
+		.setLabel(
+			closing
+				? getRule(closing.ruleId).actionLabel
+				: `${getRule(pending[0].ruleId).actionLabel}${countNote}`
+		)
+		.setStyle(closing ? ButtonStyle.Danger : ButtonStyle.Primary);
 
 	const ignoreButton = new ButtonBuilder()
-		.setCustomId(buildButtonId('ignore', finding.id))
-		.setLabel('Ignore')
+		.setCustomId(buildButtonId('ignore', pending[0].id))
+		.setLabel(pending.length > 1 ? 'Ignore all' : 'Ignore')
 		.setStyle(ButtonStyle.Secondary);
 
 	return {

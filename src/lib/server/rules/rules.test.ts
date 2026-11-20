@@ -10,6 +10,13 @@ import { findNoReplyEmail, findOwnerEmailLine } from './noReplyEmail.ts';
 import { findNsRecords } from './nsRecords.ts';
 import { findCnameLine, findUnsupportedCname } from './unsupportedCname.ts';
 import { findVercelLinks, redirectsToVercelLogin } from './vercelLogin.ts';
+import {
+	findVercelTxt,
+	vercelFileFor,
+	vercelFileNameRule,
+	vercelTxtRecordRule
+} from './vercelVerification.ts';
+import type { DomainFile, RuleContext } from './types.ts';
 
 describe('findNsRecords', () => {
 	test('finds NS records under "records"', () => {
@@ -217,5 +224,92 @@ describe('redirectsToVercelLogin', () => {
 		assert.equal(await redirectsToVercelLogin('https://sneaky.vercel.app/'), false);
 		assert.deepEqual(requested, ['https://sneaky.vercel.app/']);
 		globalThis.fetch = realFetch;
+	});
+});
+
+function contextFor(repo: string, files: Partial<DomainFile>[]): RuleContext {
+	return {
+		pullRequest: { repo } as RuleContext['pullRequest'],
+		files: files.map((file) => ({
+			path: 'domains/x.json',
+			status: 'added',
+			patch: undefined,
+			content: '',
+			json: null,
+			...file
+		})),
+		getEligibility: async () => ({
+			eligible: true,
+			explanation: ''
+		})
+	};
+}
+
+describe('Vercel verification records', () => {
+	test('works out the _vercel file from any file of the registration', () => {
+		const dev = 'is-a-dev/register';
+		const bot = 'free-domains/is-a.bot';
+
+		assert.equal(
+			vercelFileFor('domains/_vercel.www.alice.json', dev),
+			'domains/_vercel.alice.json'
+		);
+		assert.equal(
+			vercelFileFor('domains/_vercel.alice.is-a.dev.json', dev),
+			'domains/_vercel.alice.json'
+		);
+		assert.equal(
+			vercelFileFor('domains/_vercel.alice.is-a.bot.json', bot),
+			'domains/_vercel.alice.json'
+		);
+		assert.equal(vercelFileFor('domains/www.alice.json', dev), 'domains/_vercel.alice.json');
+		assert.equal(vercelFileFor('domains/alice.json', dev), 'domains/_vercel.alice.json');
+	});
+
+	test('flags misnamed _vercel files only', async () => {
+		const violations = await vercelFileNameRule.evaluate(
+			contextFor('is-a-dev/register', [
+				{ path: 'domains/_vercel.www.alice.json' },
+				{ path: 'domains/_vercel.bob.json' },
+				{ path: 'domains/www.carol.json' }
+			])
+		);
+
+		assert.deepEqual(
+			violations.map((violation) => violation.filePath),
+			['domains/_vercel.www.alice.json']
+		);
+	});
+
+	test('finds Vercel tokens in TXT strings and lists', () => {
+		const token = 'vc-domain-verify=alice.is-a.dev,abc123';
+
+		assert.deepEqual(findVercelTxt({ records: { TXT: token } }), [token]);
+		assert.deepEqual(findVercelTxt({ records: { TXT: ['v=spf1 -all', token] } }), [token]);
+		assert.deepEqual(findVercelTxt({ records: { TXT: 'v=spf1 -all' } }), []);
+		assert.deepEqual(findVercelTxt(null), []);
+	});
+
+	test('flags a Vercel TXT in a domain file, but not in its _vercel file', async () => {
+		const json = { records: { TXT: 'vc-domain-verify=alice.is-a.dev,abc123' } };
+
+		const violations = await vercelTxtRecordRule.evaluate(
+			contextFor('is-a-dev/register', [
+				{
+					path: 'domains/alice.json',
+					json
+				},
+				{
+					path: 'domains/_vercel.alice.json',
+					json
+				}
+			])
+		);
+
+		assert.deepEqual(
+			violations.map((violation) => violation.filePath),
+			['domains/alice.json']
+		);
+		assert.ok(violations[0].reason.includes('domains/_vercel.alice.json'));
 	});
 });

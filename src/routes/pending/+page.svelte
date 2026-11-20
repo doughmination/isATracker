@@ -4,6 +4,7 @@
 
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import RepoFilter from '#lib/components/RepoFilter.svelte';
 	import { formatTimestamp, labelFor, repoLabel, ruleLabels, severityLabels } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
@@ -30,6 +31,8 @@
 
 <h1>Pending reviews</h1>
 
+<RepoFilter repos={data.repos} current={data.repoFilter} />
+
 {#if form?.outcome}
 	<p class="notice {form.outcome.status}" role="status">
 		{form.outcome.summary}
@@ -39,65 +42,66 @@
 	</p>
 {/if}
 
-{#if data.findings.length === 0}
+{#if data.pullRequests.length === 0}
 	<p class="card muted">Nothing is waiting for a decision.</p>
 {/if}
 
-{#each data.findings as finding (finding.id)}
+{#each data.pullRequests as pullRequest (pullRequest.key)}
 	<article class="card">
 		<h2>
-			<a href={finding.url} target="_blank" rel="noreferrer">
-				{repoLabel(finding.repo)} #{finding.prNumber}
+			<a href={pullRequest.url} target="_blank" rel="noreferrer">
+				{repoLabel(pullRequest.repo)} #{pullRequest.prNumber}
 			</a>
-			{finding.title}
+			{pullRequest.title}
 		</h2>
 
-		<dl>
-			<dt>Violation</dt>
-			<dd>{labelFor(ruleLabels, finding.ruleId)}</dd>
+		<p class="muted">By {pullRequest.author}</p>
 
-			<dt>Severity</dt>
-			<dd>{severityLabels[finding.severity]}</dd>
+		{#each pullRequest.violations as violation (violation.id)}
+			<dl>
+				<dt>Violation</dt>
+				<dd>
+					{labelFor(ruleLabels, violation.ruleId)}
+					<span class="muted">({severityLabels[violation.severity]})</span>
+				</dd>
 
-			{#if finding.otherRuleIds.length > 0}
-				<dt>Also on this PR</dt>
-				<dd>{finding.otherRuleIds.map((ruleId) => labelFor(ruleLabels, ruleId)).join(', ')}</dd>
-			{/if}
+				<dt>File</dt>
+				<dd><code>{violation.filePath}</code></dd>
 
-			<dt>Author</dt>
-			<dd>{finding.author}</dd>
+				<dt>Reason</dt>
+				<dd>{violation.reason}</dd>
 
-			<dt>File</dt>
-			<dd><code>{finding.filePath}</code></dd>
+				<dt>Detected</dt>
+				<dd>{formatTimestamp(violation.createdAt)}</dd>
+			</dl>
+		{/each}
 
-			<dt>Reason</dt>
-			<dd>{finding.reason}</dd>
+		{#if pullRequest.lastOutcome}
+			<p class="muted">Last result: {pullRequest.lastOutcome}</p>
+		{/if}
 
-			<dt>Detected</dt>
-			<dd>{formatTimestamp(finding.createdAt)}</dd>
+		{#if pullRequest.actionFindingId !== null}
+			{@const findingId = pullRequest.actionFindingId}
 
-			{#if finding.lastOutcome}
-				<dt>Last result</dt>
-				<dd>{finding.lastOutcome}</dd>
-			{/if}
-		</dl>
+			<div class="formRow">
+				<form method="POST" action="?/approve" use:enhance={trackBusy(findingId)}>
+					<input type="hidden" name="findingId" value={findingId} />
+					<button
+						class={pullRequest.actionType === 'closePr' ? 'danger' : 'primary'}
+						disabled={busyFindingId !== null}
+					>
+						{busyFindingId === findingId ? 'Working…' : pullRequest.actionLabel}
+					</button>
+				</form>
 
-		<div class="formRow">
-			<form method="POST" action="?/approve" use:enhance={trackBusy(finding.id)}>
-				<input type="hidden" name="findingId" value={finding.id} />
-				<button
-					class={finding.actionType === 'closePr' ? 'danger' : 'primary'}
-					disabled={busyFindingId !== null}
-				>
-					{busyFindingId === finding.id ? 'Working…' : finding.actionLabel}
-				</button>
-			</form>
-
-			<form method="POST" action="?/ignore" use:enhance={trackBusy(finding.id)}>
-				<input type="hidden" name="findingId" value={finding.id} />
-				<button disabled={busyFindingId !== null}>Ignore</button>
-			</form>
-		</div>
+				<form method="POST" action="?/ignore" use:enhance={trackBusy(findingId)}>
+					<input type="hidden" name="findingId" value={findingId} />
+					<button disabled={busyFindingId !== null}>{pullRequest.ignoreLabel}</button>
+				</form>
+			</div>
+		{:else}
+			<p class="muted">Working…</p>
+		{/if}
 	</article>
 {/each}
 
@@ -107,6 +111,8 @@
 		grid-template-columns: 7rem 1fr;
 		gap: 0.25rem 1rem;
 		margin: 0 0 1rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border);
 	}
 
 	dt {

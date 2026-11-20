@@ -3,6 +3,9 @@
 [nsRecords]
 closeComment: "Thanks for your interest in {service}!\n\nThis pull request requests `NS` records. We do not grant nameserver records to first-time contributors, so I am closing this pull request.\n\nYou are welcome to open a new pull request using other record types, such as `A`, `AAAA`, `CNAME`, `MX` or `TXT`. Once you have an accepted registration, you can request `NS` records with a clear justification for why they are needed.\n\nPlease see the [Docs](https://docs.is-a.dev/faq/#who-can-use-ns-records) for more information.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 
+[combined]
+reviewSummary: "This pull request has a few things to fix. Please see the comments below.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
+
 [unsupportedCname]
 reviewComment: "Your `CNAME` record points at a host that we do not support. Please point it at a supported host, or use another record type such as `A` or `AAAA`.\n\nIf you have requested a CloudFlare Worker, please use a legacy CloudFlare Pages project."
 reviewDismissal: "Thanks, the `CNAME` record is fixed. Dismissing the requested changes."
@@ -17,3 +20,13 @@ reviewSummary: "Please see the inline comment on `owner.email`.\n<sub>This comme
 reviewComment: "Your website preview is not live: it redirects to the Vercel login page, so we cannot review it.\n\nTo make it public:\n\n1. Open your project dashboard on Vercel.\n2. Navigate to **Settings > Deployment Protection**.\n3. Toggle off **Vercel Authentication** (Require Login) and click **Save**.\n4. Test your link in an Incognito window to confirm it loads without a login prompt.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 reviewDismissal: "Thanks, your website preview now loads without a login. Dismissing the requested changes."
 reviewSummary: "Please see the comment on your website preview.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
+
+[vercelFileName]
+reviewComment: "This file has the wrong name for a Vercel verification record. Vercel checks the `_vercel` record of your registered domain, so please rename this file to `{vercelFile}`."
+reviewDismissal: "Thanks, the Vercel verification file is named correctly now. Dismissing the requested changes."
+reviewSummary: "Please see the inline comment on the Vercel verification file name.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
+
+[vercelTxtRecord]
+reviewComment: "This `TXT` record is a Vercel verification record (`vc-domain-verify=...`). Vercel looks for it on the `_vercel` record, not on your domain, so please remove it from this file and put it in its own file, `{vercelFile}`."
+reviewDismissal: "Thanks, the Vercel verification record has moved out of the domain file. Dismissing the requested changes."
+reviewSummary: "Please see the inline comment on the Vercel `TXT` record.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"

@@ -405,4 +405,134 @@ describe('moderation pipeline', () => {
 			true
 		);
 	});
+
+	test('one approval sends one review covering every issue on the PR', async () => {
+		addPullRequest({
+			number: 6,
+			author: 'combo',
+			association: 'NONE',
+			sha: 'sha-six',
+			state: 'open',
+			updatedAt: '2026-11-04T00:00:00Z',
+			fileName: 'domains/combo.json',
+			json: {
+				owner: {
+					username: 'combo',
+					email: '1+combo@users.noreply.github.com'
+				},
+				records: {
+					A: ['1.2.3.4'],
+					TXT: 'vc-domain-verify=combo.is-a.dev,abc123'
+				}
+			}
+		});
+
+		await scanOnce(repo);
+
+		const findings = listFindingsForPullRequest(repo, 6);
+
+		assert.deepEqual(findings.map((finding) => finding.ruleId).sort(), [
+			'noReplyEmail',
+			'vercelTxtRecord'
+		]);
+
+		const outcome = await performModerationAction({
+			findingId: findings[0].id,
+			decision: 'approve',
+			source: 'discord'
+		});
+
+		const reviews = writes.filter((write) => write.path === '/pulls/6/reviews');
+
+		assert.equal(outcome.status, 'success');
+		assert.equal(reviews.length, 1);
+		assert.equal(reviews[0].body.comments?.length, 2);
+		assert.ok(
+			reviews[0].body.comments?.some((comment) =>
+				comment.body.includes('domains/_vercel.combo.json')
+			)
+		);
+		assert.ok(
+			listFindingsForPullRequest(repo, 6).every((finding) => finding.status === 'actioned')
+		);
+	});
+
+	test('a combined review is dismissed only once every issue is fixed', async () => {
+		const pullRequest = fakePullRequests.get(6)!;
+		const dismissals = () =>
+			writes.filter((write) => write.method === 'PUT' && write.path.startsWith('/pulls/6/'));
+
+		pullRequest.sha = 'sha-six-email';
+		pullRequest.updatedAt = '2026-11-04T01:00:00Z';
+		pullRequest.json = {
+			owner: { username: 'combo' },
+			records: {
+				A: ['1.2.3.4'],
+				TXT: 'vc-domain-verify=combo.is-a.dev,abc123'
+			}
+		};
+
+		await scanOnce(repo);
+
+		assert.equal(dismissals().length, 0);
+
+		pullRequest.sha = 'sha-six-fixed';
+		pullRequest.updatedAt = '2026-11-04T02:00:00Z';
+		pullRequest.json = {
+			owner: { username: 'combo' },
+			records: { A: ['1.2.3.4'] }
+		};
+
+		await scanOnce(repo);
+
+		assert.equal(dismissals().length, 1);
+		assert.ok(
+			listFindingsForPullRequest(repo, 6).every((finding) => finding.status === 'resolved')
+		);
+	});
+
+	test('NS on the PR closes it and settles every other issue with it', async () => {
+		addPullRequest({
+			number: 7,
+			author: 'mixed',
+			association: 'NONE',
+			sha: 'sha-seven',
+			state: 'open',
+			updatedAt: '2026-11-05T00:00:00Z',
+			fileName: 'domains/mixed.json',
+			json: {
+				owner: {
+					username: 'mixed',
+					email: '2+mixed@users.noreply.github.com'
+				},
+				records: {
+					NS: ['ns1.example.com']
+				}
+			}
+		});
+
+		await scanOnce(repo);
+
+		const ignored = listFindingsForPullRequest(repo, 7).find(
+			(finding) => finding.ruleId === 'noReplyEmail'
+		)!;
+
+		// Pressing the button from the less serious finding still closes the PR
+		const outcome = await performModerationAction({
+			findingId: ignored.id,
+			decision: 'approve',
+			source: 'dashboard'
+		});
+
+		assert.equal(outcome.status, 'success');
+		assert.deepEqual(
+			writes
+				.filter((write) => write.path.includes('/7'))
+				.map((write) => `${write.method} ${write.path}`),
+			['POST /issues/7/comments', 'PATCH /pulls/7']
+		);
+		assert.ok(
+			listFindingsForPullRequest(repo, 7).every((finding) => finding.status === 'actioned')
+		);
+	});
 });

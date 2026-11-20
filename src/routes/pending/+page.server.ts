@@ -14,36 +14,49 @@ import { bySeverity, getRule } from '#lib/server/rules/index.ts';
 
 import type { Actions, PageServerLoad } from './$types';
 
+// One card per PR, most serious first; its buttons act on every pending finding
 export const load: PageServerLoad = ({ url }) => {
 	const openFindings = listOpenFindings(readRepoFilter(url)).sort(bySeverity);
+	const byPullRequest = new Map<string, typeof openFindings>();
 
-	const findings = openFindings.map((finding) => ({
-		id: finding.id,
-		repo: finding.repo,
-		prNumber: finding.prNumber,
-		title: finding.title,
-		author: finding.author,
-		url: finding.url,
-		ruleId: finding.ruleId,
-		filePath: finding.filePath,
-		reason: finding.reason,
-		status: finding.status,
-		lastOutcome: finding.lastOutcome,
-		createdAt: finding.createdAt,
-		actionLabel: getRule(finding.ruleId).actionLabel,
-		actionType: getRule(finding.ruleId).actionType,
-		severity: getRule(finding.ruleId).severity,
-		otherRuleIds: openFindings
-			.filter(
-				(other) =>
-					other.repo === finding.repo &&
-					other.prNumber === finding.prNumber &&
-					other.id !== finding.id
-			)
-			.map((other) => other.ruleId)
-	}));
+	for (const finding of openFindings) {
+		const key = `${finding.repo}#${finding.prNumber}`;
 
-	return { findings };
+		byPullRequest.set(key, [...(byPullRequest.get(key) ?? []), finding]);
+	}
+
+	const pullRequests = [...byPullRequest].map(([key, findings]) => {
+		const [lead] = findings;
+		const pending = findings.filter((finding) => finding.status === 'pending');
+		const closing = pending.find((finding) => getRule(finding.ruleId).actionType === 'closePr');
+		const countNote = pending.length > 1 ? ` (${pending.length})` : '';
+
+		return {
+			key,
+			repo: lead.repo,
+			prNumber: lead.prNumber,
+			title: lead.title,
+			author: lead.author,
+			url: lead.url,
+			actionFindingId: pending[0]?.id ?? null,
+			actionType: closing ? 'closePr' : 'requestChanges',
+			actionLabel: closing
+				? getRule(closing.ruleId).actionLabel
+				: `${getRule(lead.ruleId).actionLabel}${countNote}`,
+			ignoreLabel: pending.length > 1 ? 'Ignore all' : 'Ignore',
+			lastOutcome: lead.lastOutcome,
+			violations: findings.map((finding) => ({
+				id: finding.id,
+				ruleId: finding.ruleId,
+				severity: getRule(finding.ruleId).severity,
+				filePath: finding.filePath,
+				reason: finding.reason,
+				createdAt: finding.createdAt
+			}))
+		};
+	});
+
+	return { pullRequests };
 };
 
 // Same pipeline as the Discord buttons: claim, revalidate, act, audit
