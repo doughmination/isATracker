@@ -24,9 +24,12 @@
 		placeholder="PR number or GitHub pull request URL"
 		aria-label="Pull request"
 	/>
-	{#if data.repoFilter}
-		<input type="hidden" name="repo" value={data.repoFilter} />
-	{/if}
+	<!-- A pasted PR URL names its own repository and wins over this choice -->
+	<select name="repo" aria-label="Repository" value={data.repoFilter ?? data.repos[0]}>
+		{#each data.repos as repo (repo)}
+			<option value={repo}>{repoLabel(repo)}</option>
+		{/each}
+	</select>
 	<button class="primary">Check</button>
 </form>
 

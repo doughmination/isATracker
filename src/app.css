@@ -148,6 +148,7 @@ button:disabled {
 	cursor: wait;
 }
 
+select,
 input[type='text'],
 input[type='search'],
 input[type='password'] {
@@ -159,6 +160,10 @@ input[type='password'] {
 	border-radius: 0.45rem;
 	background: var(--surface-card);
 	color: var(--text-primary);
+}
+
+select {
+	width: auto;
 }
 
 .formRow {
