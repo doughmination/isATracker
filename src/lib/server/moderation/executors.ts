@@ -2,6 +2,7 @@
  * MIT — (c) Doughmination System®
  */
 
+import { repoLabel } from '../../labels.ts';
 import { getConfig } from '../config.ts';
 import { listFindingsForPullRequest, setFindingComment, setFindingStatus } from '../db/findings.ts';
 import { markPullRequestClosed } from '../db/pullRequests.ts';
@@ -33,21 +34,23 @@ type Executor = (input: ExecutorInput) => Promise<ActionOutcome>;
 
 async function closeWithPolicyComment(input: ExecutorInput): Promise<ActionOutcome> {
 	const { pullRequest, finding } = input;
+	const { repo, number } = pullRequest;
 
 	// A stored comment id means an earlier attempt already explained; never explain twice
 	if (finding.commentId === null) {
 		const comment = await createIssueComment(
-			pullRequest.number,
-			getMessages().nsRecords.closeComment
+			repo,
+			number,
+			getMessages().nsRecords.closeComment.replaceAll('{service}', repoLabel(repo))
 		);
 
 		setFindingComment(finding.id, comment.id);
 	}
 
-	await closePullRequest(pullRequest.number);
+	await closePullRequest(repo, number);
 
-	markPullRequestClosed(pullRequest.number);
-	retireFindings(pullRequest.number, 'The pull request was closed through the tool.');
+	markPullRequestClosed(repo, number);
+	retireFindings(repo, number, 'The pull request was closed through the tool.');
 
 	return {
 		status: 'success',
@@ -76,7 +79,7 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 	const marker = reviewMarker(finding);
 
 	const login = await getAuthenticatedLogin();
-	const reviews = await listReviews(pullRequest.number);
+	const reviews = await listReviews(pullRequest.repo, pullRequest.number);
 
 	const duplicate = reviews.find(
 		(review) =>
@@ -106,6 +109,7 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 	if (canCommentInline) {
 		try {
 			const review = await createChangesRequestedReview({
+				repo: pullRequest.repo,
 				number: pullRequest.number,
 				commitId: pullRequest.headSha,
 				body: `${messages.reviewSummary}\n\n${marker}`,
@@ -133,6 +137,7 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 	}
 
 	const review = await createChangesRequestedReview({
+		repo: pullRequest.repo,
 		number: pullRequest.number,
 		commitId: pullRequest.headSha,
 		body: fallbackBody,
@@ -151,7 +156,7 @@ export async function dismissFixedChangeRequests(
 	pullRequest: PullRequestSummary,
 	violations: Violation[]
 ): Promise<void> {
-	const fixed = listFindingsForPullRequest(pullRequest.number).filter(
+	const fixed = listFindingsForPullRequest(pullRequest.repo, pullRequest.number).filter(
 		(finding) =>
 			finding.status === 'actioned' &&
 			getRule(finding.ruleId).actionType === 'requestChanges' &&
@@ -166,7 +171,7 @@ export async function dismissFixedChangeRequests(
 	}
 
 	const login = await getAuthenticatedLogin();
-	const reviews = await listReviews(pullRequest.number);
+	const reviews = await listReviews(pullRequest.repo, pullRequest.number);
 
 	for (const finding of fixed) {
 		const marker = reviewMarker(finding);
@@ -179,7 +184,12 @@ export async function dismissFixedChangeRequests(
 		);
 
 		for (const review of openReviews) {
-			await dismissReview(pullRequest.number, review.id, reviewMessages(finding).reviewDismissal);
+			await dismissReview(
+				pullRequest.repo,
+				pullRequest.number,
+				review.id,
+				reviewMessages(finding).reviewDismissal
+			);
 		}
 
 		setFindingStatus(

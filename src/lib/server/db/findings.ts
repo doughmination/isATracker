@@ -12,7 +12,9 @@ const joinedSelect = `
 		pullRequests.author,
 		pullRequests.url
 	FROM findings
-	JOIN pullRequests ON pullRequests.number = findings.prNumber
+	JOIN pullRequests
+		ON pullRequests.repo = findings.repo
+		AND pullRequests.number = findings.prNumber
 `;
 
 export function getFinding(id: number): FindingWithPullRequest | null {
@@ -21,20 +23,22 @@ export function getFinding(id: number): FindingWithPullRequest | null {
 		.get(id);
 }
 
-export function listFindingsForPullRequest(prNumber: number): FindingRow[] {
+export function listFindingsForPullRequest(repo: string, prNumber: number): FindingRow[] {
 	return getDatabase()
-		.query<FindingRow, [number]>('SELECT * FROM findings WHERE prNumber = ?')
-		.all(prNumber);
+		.query<FindingRow, [string, number]>('SELECT * FROM findings WHERE repo = ? AND prNumber = ?')
+		.all(repo, prNumber);
 }
 
-export function listOpenFindings(): FindingWithPullRequest[] {
+// repo null = every repository
+export function listOpenFindings(repo: string | null = null): FindingWithPullRequest[] {
 	return getDatabase()
-		.query<FindingWithPullRequest, []>(
+		.query<FindingWithPullRequest, [string | null, string | null]>(
 			`${joinedSelect}
 			 WHERE findings.status IN ('pending', 'acting')
+				AND (? IS NULL OR findings.repo = ?)
 			 ORDER BY findings.createdAt DESC`
 		)
-		.all();
+		.all(repo, repo);
 }
 
 // Pending findings that never reached Discord, oldest first
@@ -49,6 +53,7 @@ export function listUnnotifiedFindings(): FindingWithPullRequest[] {
 }
 
 export interface NewFinding {
+	repo: string;
 	prNumber: number;
 	ruleId: RuleId;
 	filePath: string;
@@ -62,6 +67,7 @@ export function insertFinding(finding: NewFinding): number {
 	const result = getDatabase()
 		.query(
 			`INSERT INTO findings (
+				repo,
 				prNumber,
 				ruleId,
 				filePath,
@@ -71,9 +77,10 @@ export function insertFinding(finding: NewFinding): number {
 				createdAt,
 				updatedAt
 			)
-			VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
+			VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
 		)
 		.run(
+			finding.repo,
 			finding.prNumber,
 			finding.ruleId,
 			finding.filePath,

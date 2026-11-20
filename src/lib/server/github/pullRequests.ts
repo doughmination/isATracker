@@ -2,7 +2,7 @@
  * MIT — (c) Doughmination System®
  */
 
-import { getConfig, getRepoPath } from '../config.ts';
+import { getRepoPath } from '../config.ts';
 import type { PullRequestSummary } from '../types.ts';
 import { GitHubError, githubRequest } from './client.ts';
 
@@ -41,8 +41,9 @@ export interface ReviewComment {
 	body: string;
 }
 
-function toSummary(pullRequest: ApiPullRequest): PullRequestSummary {
+function toSummary(repo: string, pullRequest: ApiPullRequest): PullRequestSummary {
 	return {
+		repo,
 		number: pullRequest.number,
 		title: pullRequest.title,
 		author: pullRequest.user?.login ?? 'ghost',
@@ -62,12 +63,13 @@ export interface PullRequestPage {
 }
 
 export async function listPullRequests(options: {
+	repo: string;
 	state: 'open' | 'all';
 	page: number;
 	etag?: string | null;
 }): Promise<PullRequestPage> {
 	const response = await githubRequest<ApiPullRequest[]>({
-		path: `${getRepoPath()}/pulls`,
+		path: `${getRepoPath(options.repo)}/pulls`,
 		query: {
 			state: options.state,
 			sort: 'updated',
@@ -79,25 +81,29 @@ export async function listPullRequests(options: {
 	});
 
 	return {
-		pullRequests: response.notModified ? [] : response.data.map(toSummary),
+		pullRequests: response.notModified
+			? []
+			: response.data.map((pullRequest) => toSummary(options.repo, pullRequest)),
 		etag: response.etag,
 		notModified: response.notModified
 	};
 }
 
 export async function getPullRequest(
+	repo: string,
 	number: number,
 	priority = false
 ): Promise<PullRequestSummary> {
 	const response = await githubRequest<ApiPullRequest>({
-		path: `${getRepoPath()}/pulls/${number}`,
+		path: `${getRepoPath(repo)}/pulls/${number}`,
 		priority
 	});
 
-	return toSummary(response.data);
+	return toSummary(repo, response.data);
 }
 
 export async function listPullRequestFiles(
+	repo: string,
 	number: number,
 	priority = false
 ): Promise<PullRequestFile[]> {
@@ -106,7 +112,7 @@ export async function listPullRequestFiles(
 	// Three pages cover 300 files; a registration PR beyond that is not ours to judge
 	for (let page = 1; page <= 3; page += 1) {
 		const response = await githubRequest<PullRequestFile[]>({
-			path: `${getRepoPath()}/pulls/${number}/files`,
+			path: `${getRepoPath(repo)}/pulls/${number}/files`,
 			query: {
 				per_page: 100,
 				page
@@ -126,6 +132,7 @@ export async function listPullRequestFiles(
 
 // Fork commits are readable through the base repository by their SHA
 export async function getFileContent(
+	repo: string,
 	path: string,
 	ref: string,
 	priority = false
@@ -134,7 +141,7 @@ export async function getFileContent(
 
 	try {
 		const response = await githubRequest<string>({
-			path: `${getRepoPath()}/contents/${encodedPath}`,
+			path: `${getRepoPath(repo)}/contents/${encodedPath}`,
 			query: { ref },
 			accept: 'application/vnd.github.raw+json',
 			priority
@@ -150,13 +157,15 @@ export async function getFileContent(
 	}
 }
 
-export async function countMergedPullRequests(login: string, priority = false): Promise<number> {
-	const { repoOwner, repoName } = getConfig();
-
+export async function countMergedPullRequests(
+	repo: string,
+	login: string,
+	priority = false
+): Promise<number> {
 	const response = await githubRequest<{ total_count: number }>({
 		path: '/search/issues',
 		query: {
-			q: `repo:${repoOwner}/${repoName} is:pr is:merged author:${login}`,
+			q: `repo:${repo} is:pr is:merged author:${login}`,
 			per_page: 1
 		},
 		priority
@@ -185,10 +194,14 @@ export interface CreatedComment {
 	html_url: string;
 }
 
-export async function createIssueComment(number: number, body: string): Promise<CreatedComment> {
+export async function createIssueComment(
+	repo: string,
+	number: number,
+	body: string
+): Promise<CreatedComment> {
 	const response = await githubRequest<CreatedComment>({
 		method: 'POST',
-		path: `${getRepoPath()}/issues/${number}/comments`,
+		path: `${getRepoPath(repo)}/issues/${number}/comments`,
 		body: { body },
 		priority: true
 	});
@@ -196,18 +209,18 @@ export async function createIssueComment(number: number, body: string): Promise<
 	return response.data;
 }
 
-export async function closePullRequest(number: number): Promise<void> {
+export async function closePullRequest(repo: string, number: number): Promise<void> {
 	await githubRequest({
 		method: 'PATCH',
-		path: `${getRepoPath()}/pulls/${number}`,
+		path: `${getRepoPath(repo)}/pulls/${number}`,
 		body: { state: 'closed' },
 		priority: true
 	});
 }
 
-export async function listReviews(number: number): Promise<ApiReview[]> {
+export async function listReviews(repo: string, number: number): Promise<ApiReview[]> {
 	const response = await githubRequest<ApiReview[]>({
-		path: `${getRepoPath()}/pulls/${number}/reviews`,
+		path: `${getRepoPath(repo)}/pulls/${number}/reviews`,
 		query: { per_page: 100 },
 		priority: true
 	});
@@ -216,13 +229,14 @@ export async function listReviews(number: number): Promise<ApiReview[]> {
 }
 
 export async function dismissReview(
+	repo: string,
 	number: number,
 	reviewId: number,
 	message: string
 ): Promise<void> {
 	await githubRequest({
 		method: 'PUT',
-		path: `${getRepoPath()}/pulls/${number}/reviews/${reviewId}/dismissals`,
+		path: `${getRepoPath(repo)}/pulls/${number}/reviews/${reviewId}/dismissals`,
 		body: {
 			message,
 			event: 'DISMISS'
@@ -232,6 +246,7 @@ export async function dismissReview(
 }
 
 export async function createChangesRequestedReview(options: {
+	repo: string;
 	number: number;
 	commitId: string;
 	body: string;
@@ -239,7 +254,7 @@ export async function createChangesRequestedReview(options: {
 }): Promise<ApiReview> {
 	const response = await githubRequest<ApiReview>({
 		method: 'POST',
-		path: `${getRepoPath()}/pulls/${options.number}/reviews`,
+		path: `${getRepoPath(options.repo)}/pulls/${options.number}/reviews`,
 		body: {
 			commit_id: options.commitId,
 			event: 'REQUEST_CHANGES',

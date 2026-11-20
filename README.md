@@ -1,6 +1,10 @@
 # is-a-tracker
 
-A personal moderation assistant for pull requests on `is-a-dev/register`.
+A personal moderation assistant for pull requests on `is-a-dev/register` and
+`free-domains/is-a.bot`. Set the list in `GITHUB_REPOS` (comma separated, `owner/name`).
+
+The dashboard combines every repository. Use the **All / is-a.dev / is-a.bot** filter in the
+header to narrow any page to one repository.
 
 It detects two violations, pings you on Discord, and acts **only** when you press a button.
 
@@ -21,17 +25,17 @@ One Deno process runs the scanner, the Discord bot, and the SvelteKit dashboard.
 
 ### GitHub token
 
-Use a **classic** personal access token. Fine-grained tokens cannot select `is-a-dev/register`
-unless the organisation allows it.
+Use a **classic** personal access token. Fine-grained tokens cannot select the tracked
+repositories unless their organisations allow it.
 
 1. Open <https://github.com/settings/tokens> and choose **Tokens (classic)**.
 2. Generate a new token and tick only **`public_repo`**.
 3. Paste it into `GITHUB_TOKEN`.
 
 - A classic token reaches every public repository your account can write to. The tool only
-  ever calls the repository set in `GITHUB_REPO_OWNER` and `GITHUB_REPO_NAME`.
+  ever calls the repositories set in `GITHUB_REPOS`.
 - At startup the tool checks the token and logs its account, its scopes, and whether that
-  account may close pull requests on the repository.
+  account may close pull requests on each repository.
 - If the organisation enforces single sign-on, authorise the token under **Configure SSO**.
 
 ### Discord bot
@@ -53,6 +57,7 @@ done, and nothing is sent to GitHub.
 ## Wording
 
 Edit `config/messages.jp` ([JPCL](https://www.npmjs.com/package/jpcl-lang)). Changes apply on the next action, with no restart.
+`{service}` in the NS close comment becomes the repository's service name, such as `is-a.bot`.
 
 Once a contributor fixes a change request, the next scan dismisses that review with the rule's
 `reviewDismissal` wording and marks the finding resolved.

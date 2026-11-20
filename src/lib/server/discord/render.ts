@@ -10,7 +10,7 @@ import {
 	type BaseMessageOptions
 } from 'discord.js';
 
-import { severityLabels } from '../../labels.ts';
+import { repoLabel, severityLabels } from '../../labels.ts';
 import { getConfig } from '../config.ts';
 import { listFindingsForPullRequest } from '../db/findings.ts';
 import { bySeverity, getRule } from '../rules/index.ts';
@@ -46,7 +46,7 @@ export function buildButtonId(decision: 'approve' | 'ignore', findingId: number)
 
 // Other open violations on the same PR, most serious first
 function describeOtherFindings(finding: FindingWithPullRequest): string {
-	const others = listFindingsForPullRequest(finding.prNumber)
+	const others = listFindingsForPullRequest(finding.repo, finding.prNumber)
 		.filter(
 			(other) =>
 				other.id !== finding.id && (other.status === 'pending' || other.status === 'acting')
@@ -63,7 +63,7 @@ export function renderFinding(finding: FindingWithPullRequest): BaseMessageOptio
 	const rule = getRule(finding.ruleId);
 
 	const embed = new EmbedBuilder()
-		.setTitle(truncate(`#${finding.prNumber} · ${finding.title}`, 250))
+		.setTitle(truncate(`${repoLabel(finding.repo)} #${finding.prNumber} · ${finding.title}`, 250))
 		.setURL(finding.url)
 		.setColor(statusColours[finding.status])
 		.addFields(

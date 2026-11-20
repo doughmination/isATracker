@@ -75,21 +75,23 @@ export async function checkToken(): Promise<void> {
 			priority: true
 		});
 
-		const repository = await githubRequest<RepositoryAccess>({
-			path: getRepoPath(),
-			priority: true
-		});
+		for (const repo of getConfig().repos) {
+			const repository = await githubRequest<RepositoryAccess>({
+				path: getRepoPath(repo),
+				priority: true
+			});
 
-		const permissions = repository.data.permissions;
+			const permissions = repository.data.permissions;
 
-		const report = describeToken({
-			login: user.data.login,
-			scopes: user.scopes,
-			canTriage: Boolean(permissions?.triage || permissions?.push)
-		});
+			const report = describeToken({
+				login: user.data.login,
+				scopes: user.scopes,
+				canTriage: Boolean(permissions?.triage || permissions?.push)
+			});
 
-		for (const line of report.lines) {
-			logger[report.level](line);
+			for (const line of report.lines) {
+				logger[report.level](`${repo}: ${line}`);
+			}
 		}
 	} catch (error) {
 		logger.error(`Could not verify GITHUB_TOKEN: ${describeError(error)}`);

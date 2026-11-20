@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-	import { labelFor, ruleLabels } from '#lib/labels.ts';
+	import { labelFor, repoLabel, ruleLabels } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
 
@@ -24,6 +24,9 @@
 		placeholder="PR number or GitHub pull request URL"
 		aria-label="Pull request"
 	/>
+	{#if data.repoFilter}
+		<input type="hidden" name="repo" value={data.repoFilter} />
+	{/if}
 	<button class="primary">Check</button>
 </form>
 
@@ -37,7 +40,7 @@
 	<section class="card">
 		<h2>
 			<a href={result.pullRequest.url} target="_blank" rel="noreferrer">
-				#{result.pullRequest.number}
+				{repoLabel(result.pullRequest.repo)} #{result.pullRequest.number}
 			</a>
 			{result.pullRequest.title}
 		</h2>

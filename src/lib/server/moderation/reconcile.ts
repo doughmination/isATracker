@@ -30,7 +30,10 @@ function shouldReopen(finding: FindingRow): boolean {
 // Brings stored findings in line with what the latest commit actually violates
 export function reconcileFindings(pullRequest: PullRequestSummary, violations: Violation[]): void {
 	const existing = new Map(
-		listFindingsForPullRequest(pullRequest.number).map((finding) => [findingKey(finding), finding])
+		listFindingsForPullRequest(pullRequest.repo, pullRequest.number).map((finding) => [
+			findingKey(finding),
+			finding
+		])
 	);
 
 	const violatedKeys = new Set<string>();
@@ -43,6 +46,7 @@ export function reconcileFindings(pullRequest: PullRequestSummary, violations: V
 
 		if (!finding) {
 			const findingId = insertFinding({
+				repo: pullRequest.repo,
 				prNumber: pullRequest.number,
 				ruleId: violation.ruleId,
 				filePath: violation.filePath,
@@ -76,8 +80,8 @@ export function reconcileFindings(pullRequest: PullRequestSummary, violations: V
 }
 
 // Retires every open finding of a PR that is no longer open
-export function retireFindings(prNumber: number, explanation: string): void {
-	for (const finding of listFindingsForPullRequest(prNumber)) {
+export function retireFindings(repo: string, prNumber: number, explanation: string): void {
+	for (const finding of listFindingsForPullRequest(repo, prNumber)) {
 		if (finding.status === 'pending') {
 			setFindingStatus(finding.id, 'prClosed', explanation);
 			emitFindingEvent('findingChanged', finding.id);

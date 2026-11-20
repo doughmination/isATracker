@@ -50,7 +50,7 @@ async function resolveDecision(
 	}
 
 	// Revalidate against the latest commit before touching anything
-	const pullRequest = await getPullRequest(finding.prNumber, true);
+	const pullRequest = await getPullRequest(finding.repo, finding.prNumber, true);
 
 	upsertPullRequest(pullRequest);
 
@@ -157,6 +157,7 @@ export async function performModerationAction(options: {
 
 	recordAction({
 		findingId: finding.id,
+		repo: finding.repo,
 		prNumber: finding.prNumber,
 		contributor: finding.author,
 		ruleId: finding.ruleId,

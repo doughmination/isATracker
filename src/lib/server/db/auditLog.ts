@@ -12,6 +12,7 @@ export function recordAction(action: NewAction): void {
 		.query(
 			`INSERT INTO actions (
 				findingId,
+				repo,
 				prNumber,
 				contributor,
 				ruleId,
@@ -22,10 +23,11 @@ export function recordAction(action: NewAction): void {
 				githubUrl,
 				createdAt
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			action.findingId,
+			action.repo,
 			action.prNumber,
 			action.contributor,
 			action.ruleId,
@@ -38,21 +40,32 @@ export function recordAction(action: NewAction): void {
 		);
 }
 
-export function searchActions(searchText: string, limit = 200): ActionRow[] {
+// repo null = every repository
+export function searchActions(
+	searchText: string,
+	repo: string | null = null,
+	limit = 200
+): ActionRow[] {
 	const pattern = `%${searchText.trim().replace(/^#/, '')}%`;
 
 	return getDatabase()
-		.query<ActionRow, [string, string, string, string, string, number]>(
+		.query<
+			ActionRow,
+			[string | null, string | null, string, string, string, string, string, number]
+		>(
 			`SELECT * FROM actions
-			 WHERE CAST(prNumber AS TEXT) LIKE ?
-				OR contributor LIKE ?
-				OR ruleId LIKE ?
-				OR actionType LIKE ?
-				OR status LIKE ?
+			 WHERE (? IS NULL OR repo = ?)
+				AND (
+					CAST(prNumber AS TEXT) LIKE ?
+					OR contributor LIKE ?
+					OR ruleId LIKE ?
+					OR actionType LIKE ?
+					OR status LIKE ?
+				)
 			 ORDER BY id DESC
 			 LIMIT ?`
 		)
-		.all(pattern, pattern, pattern, pattern, pattern, limit);
+		.all(repo, repo, pattern, pattern, pattern, pattern, pattern, limit);
 }
 
 export interface DailyActionCount {
@@ -69,29 +82,33 @@ export interface ModerationStats {
 	daily: DailyActionCount[];
 }
 
-function countWhere(table: 'actions' | 'findings', condition: string): number {
+function countWhere(table: 'actions' | 'findings', condition: string, repo: string | null): number {
 	const row = getDatabase()
-		.query<{ total: number }, []>(`SELECT COUNT(*) AS total FROM ${table} WHERE ${condition}`)
-		.get();
+		.query<{ total: number }, [string | null, string | null]>(
+			`SELECT COUNT(*) AS total FROM ${table}
+			 WHERE (? IS NULL OR repo = ?) AND ${condition}`
+		)
+		.get(repo, repo);
 
 	return row?.total ?? 0;
 }
 
-// Only successful actions count towards statistics
-export function getModerationStats(dayCount = 30): ModerationStats {
+// Only successful actions count towards statistics; repo null = every repository
+export function getModerationStats(dayCount = 30, repo: string | null = null): ModerationStats {
 	const rows = getDatabase()
-		.query<DailyActionCount, [string]>(
+		.query<DailyActionCount, [string | null, string | null, string]>(
 			`SELECT
 				substr(createdAt, 1, 10) AS day,
 				SUM(actionType = 'closePr') AS closures,
 				SUM(actionType = 'requestChanges') AS reviews
 			 FROM actions
-			 WHERE status = 'success'
+			 WHERE (? IS NULL OR repo = ?)
+				AND status = 'success'
 				AND actionType IN ('closePr', 'requestChanges')
 				AND createdAt >= ?
 			 GROUP BY day`
 		)
-		.all(new Date(Date.now() - dayCount * 86_400_000).toISOString());
+		.all(repo, repo, new Date(Date.now() - dayCount * 86_400_000).toISOString());
 
 	const countsByDay = new Map(rows.map((row) => [row.day, row]));
 	const daily: DailyActionCount[] = [];
@@ -108,13 +125,18 @@ export function getModerationStats(dayCount = 30): ModerationStats {
 	}
 
 	return {
-		closedTotal: countWhere('actions', `status = 'success' AND actionType = 'closePr'`),
+		closedTotal: countWhere('actions', `status = 'success' AND actionType = 'closePr'`, repo),
 		nsClosures: countWhere(
 			'actions',
-			`status = 'success' AND actionType = 'closePr' AND ruleId = 'nsRecords'`
+			`status = 'success' AND actionType = 'closePr' AND ruleId = 'nsRecords'`,
+			repo
 		),
-		reviewsTotal: countWhere('actions', `status = 'success' AND actionType = 'requestChanges'`),
-		pendingTotal: countWhere('findings', `status IN ('pending', 'acting')`),
+		reviewsTotal: countWhere(
+			'actions',
+			`status = 'success' AND actionType = 'requestChanges'`,
+			repo
+		),
+		pendingTotal: countWhere('findings', `status IN ('pending', 'acting')`, repo),
 		daily
 	};
 }

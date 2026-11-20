@@ -5,24 +5,28 @@
 import { getDatabase, nowIso } from './database.ts';
 
 export interface ContributorRow {
+	repo: string;
 	login: string;
 	mergedPrCount: number;
 	checkedAt: string;
 }
 
-export function getContributor(login: string): ContributorRow | null {
+// Merged PR counts are per repository
+export function getContributor(repo: string, login: string): ContributorRow | null {
 	return getDatabase()
-		.query<ContributorRow, [string]>('SELECT * FROM contributors WHERE login = ?')
-		.get(login.toLowerCase());
+		.query<ContributorRow, [string, string]>(
+			'SELECT * FROM contributors WHERE repo = ? AND login = ?'
+		)
+		.get(repo, login.toLowerCase());
 }
 
-export function saveContributor(login: string, mergedPrCount: number): void {
+export function saveContributor(repo: string, login: string, mergedPrCount: number): void {
 	getDatabase()
 		.query(
-			`INSERT INTO contributors (login, mergedPrCount, checkedAt) VALUES (?, ?, ?)
-			 ON CONFLICT (login) DO UPDATE SET
+			`INSERT INTO contributors (repo, login, mergedPrCount, checkedAt) VALUES (?, ?, ?, ?)
+			 ON CONFLICT (repo, login) DO UPDATE SET
 				mergedPrCount = excluded.mergedPrCount,
 				checkedAt = excluded.checkedAt`
 		)
-		.run(login.toLowerCase(), mergedPrCount, nowIso());
+		.run(repo, login.toLowerCase(), mergedPrCount, nowIso());
 }

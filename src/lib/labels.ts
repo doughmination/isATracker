@@ -30,6 +30,14 @@ export const statusLabels: Record<string, string> = {
 	dryRun: 'Dry run'
 };
 
+// is-a-dev/register -> is-a.dev, free-domains/is-a.bot -> is-a.bot
+export function repoLabel(repo: string): string {
+	const [owner, name] = repo.split('/');
+
+	// shortcut: guesses the service from the repo name, fine for the is-a family
+	return name.includes('.') ? name : owner.replace(/-([^-]+)$/, '.$1');
+}
+
 export function labelFor(labels: Record<string, string>, key: string): string {
 	return labels[key] ?? key;
 }

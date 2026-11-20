@@ -4,6 +4,7 @@
 
 import { fail } from '@sveltejs/kit';
 
+import { readRepoFilter } from '#lib/server/config.ts';
 import { listOpenFindings } from '#lib/server/db/findings.ts';
 import {
 	performModerationAction,
@@ -13,11 +14,12 @@ import { bySeverity, getRule } from '#lib/server/rules/index.ts';
 
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = () => {
-	const openFindings = listOpenFindings().sort(bySeverity);
+export const load: PageServerLoad = ({ url }) => {
+	const openFindings = listOpenFindings(readRepoFilter(url)).sort(bySeverity);
 
 	const findings = openFindings.map((finding) => ({
 		id: finding.id,
+		repo: finding.repo,
 		prNumber: finding.prNumber,
 		title: finding.title,
 		author: finding.author,
@@ -32,7 +34,12 @@ export const load: PageServerLoad = () => {
 		actionType: getRule(finding.ruleId).actionType,
 		severity: getRule(finding.ruleId).severity,
 		otherRuleIds: openFindings
-			.filter((other) => other.prNumber === finding.prNumber && other.id !== finding.id)
+			.filter(
+				(other) =>
+					other.repo === finding.repo &&
+					other.prNumber === finding.prNumber &&
+					other.id !== finding.id
+			)
 			.map((other) => other.ruleId)
 	}));
 

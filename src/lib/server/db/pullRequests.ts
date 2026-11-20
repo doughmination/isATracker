@@ -5,10 +5,12 @@
 import type { PullRequestRow, PullRequestSummary } from '../types.ts';
 import { getDatabase, nowIso } from './database.ts';
 
-export function getPullRequestRow(number: number): PullRequestRow | null {
+export function getPullRequestRow(repo: string, number: number): PullRequestRow | null {
 	return getDatabase()
-		.query<PullRequestRow, [number]>('SELECT * FROM pullRequests WHERE number = ?')
-		.get(number);
+		.query<PullRequestRow, [string, number]>(
+			'SELECT * FROM pullRequests WHERE repo = ? AND number = ?'
+		)
+		.get(repo, number);
 }
 
 // Saves the latest PR details and leaves the scan markers untouched
@@ -16,6 +18,7 @@ export function upsertPullRequest(pullRequest: PullRequestSummary): void {
 	getDatabase()
 		.query<unknown, [Record<string, string | number>]>(
 			`INSERT INTO pullRequests (
+				repo,
 				number,
 				title,
 				author,
@@ -26,6 +29,7 @@ export function upsertPullRequest(pullRequest: PullRequestSummary): void {
 				updatedAt
 			)
 			VALUES (
+				$repo,
 				$number,
 				$title,
 				$author,
@@ -35,7 +39,7 @@ export function upsertPullRequest(pullRequest: PullRequestSummary): void {
 				$headSha,
 				$updatedAt
 			)
-			ON CONFLICT (number) DO UPDATE SET
+			ON CONFLICT (repo, number) DO UPDATE SET
 				title = excluded.title,
 				author = excluded.author,
 				authorAssociation = excluded.authorAssociation,
@@ -45,6 +49,7 @@ export function upsertPullRequest(pullRequest: PullRequestSummary): void {
 				updatedAt = excluded.updatedAt`
 		)
 		.run({
+			$repo: pullRequest.repo,
 			$number: pullRequest.number,
 			$title: pullRequest.title,
 			$author: pullRequest.author,
@@ -56,12 +61,14 @@ export function upsertPullRequest(pullRequest: PullRequestSummary): void {
 		});
 }
 
-export function markPullRequestScanned(number: number, scannedSha: string): void {
+export function markPullRequestScanned(repo: string, number: number, scannedSha: string): void {
 	getDatabase()
-		.query('UPDATE pullRequests SET scannedSha = ?, scannedAt = ? WHERE number = ?')
-		.run(scannedSha, nowIso(), number);
+		.query('UPDATE pullRequests SET scannedSha = ?, scannedAt = ? WHERE repo = ? AND number = ?')
+		.run(scannedSha, nowIso(), repo, number);
 }
 
-export function markPullRequestClosed(number: number): void {
-	getDatabase().query(`UPDATE pullRequests SET state = 'closed' WHERE number = ?`).run(number);
+export function markPullRequestClosed(repo: string, number: number): void {
+	getDatabase()
+		.query(`UPDATE pullRequests SET state = 'closed' WHERE repo = ? AND number = ?`)
+		.run(repo, number);
 }

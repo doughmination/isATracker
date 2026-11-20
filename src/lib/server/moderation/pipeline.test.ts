@@ -8,6 +8,9 @@ import { before, describe, test } from 'node:test';
 process.env.DATABASE_PATH = ':memory:';
 process.env.GITHUB_TOKEN = 'test-token';
 process.env.DRY_RUN = 'true';
+process.env.GITHUB_REPOS = 'is-a-dev/register';
+
+const repo = 'is-a-dev/register';
 
 import { getConfig } from '../config.ts';
 import { getModerationStats, searchActions } from '../db/auditLog.ts';
@@ -183,7 +186,7 @@ async function fakeGitHub(input: string | URL | Request, init?: RequestInit): Pr
 }
 
 function findingFor(prNumber: number) {
-	return listFindingsForPullRequest(prNumber)[0];
+	return listFindingsForPullRequest(repo, prNumber)[0];
 }
 
 before(() => {
@@ -237,19 +240,19 @@ before(() => {
 
 describe('moderation pipeline', () => {
 	test('a scan creates one finding per real violation', async () => {
-		await scanOnce();
+		await scanOnce(repo);
 
 		assert.equal(findingFor(1).ruleId, 'nsRecords');
 		assert.equal(findingFor(2).ruleId, 'noReplyEmail');
-		assert.equal(listFindingsForPullRequest(3).length, 0);
+		assert.equal(listFindingsForPullRequest(repo, 3).length, 0);
 		assert.equal(findingFor(4).status, 'pending');
 	});
 
 	test('a repeat scan creates no duplicates', async () => {
-		await scanOnce();
+		await scanOnce(repo);
 
-		assert.equal(listFindingsForPullRequest(1).length, 1);
-		assert.equal(listFindingsForPullRequest(2).length, 1);
+		assert.equal(listFindingsForPullRequest(repo, 1).length, 1);
+		assert.equal(listFindingsForPullRequest(repo, 2).length, 1);
 	});
 
 	test('dry run writes nothing and leaves the finding pending', async () => {
@@ -327,8 +330,8 @@ describe('moderation pipeline', () => {
 			records: { CNAME: 'hidden.github.io' }
 		};
 
-		await scanOnce();
-		await scanOnce();
+		await scanOnce(repo);
+		await scanOnce(repo);
 
 		const dismissals = writes.filter((write) => write.method === 'PUT');
 
@@ -348,7 +351,7 @@ describe('moderation pipeline', () => {
 			records: { CNAME: 'fixer.github.io' }
 		};
 
-		await scanOnce();
+		await scanOnce(repo);
 
 		assert.equal(findingFor(4).status, 'resolved');
 	});
@@ -365,7 +368,7 @@ describe('moderation pipeline', () => {
 			json: nsJson
 		});
 
-		await scanOnce();
+		await scanOnce(repo);
 
 		// The contributor removes the NS records before the button is pressed
 		const pullRequest = fakePullRequests.get(5)!;

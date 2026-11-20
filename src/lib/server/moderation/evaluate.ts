@@ -34,7 +34,11 @@ export async function evaluatePullRequest(
 		priority: boolean;
 	}
 ): Promise<Evaluation> {
-	const changedFiles = await listPullRequestFiles(pullRequest.number, options.priority);
+	const changedFiles = await listPullRequestFiles(
+		pullRequest.repo,
+		pullRequest.number,
+		options.priority
+	);
 
 	const candidates = changedFiles.filter(
 		(file) => registrationFile.test(file.filename) && file.status !== 'removed'
@@ -44,7 +48,12 @@ export async function evaluatePullRequest(
 	const files: DomainFile[] = [];
 
 	for (const file of inspected) {
-		const content = await getFileContent(file.filename, pullRequest.headSha, options.priority);
+		const content = await getFileContent(
+			pullRequest.repo,
+			file.filename,
+			pullRequest.headSha,
+			options.priority
+		);
 
 		if (content === null) {
 			continue;

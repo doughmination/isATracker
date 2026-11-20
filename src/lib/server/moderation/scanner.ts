@@ -20,26 +20,32 @@ import { reconcileFindings, retireFindings } from './reconcile.ts';
 
 const logger = createLogger('scanner');
 
-const watermarkKey = 'scanner.watermark';
-const etagKey = 'scanner.etag';
-const lastScanKey = 'scanner.lastScanAt';
-const lastErrorKey = 'scanner.lastError';
+// Scanner state is kept per repository
+const watermarkKey = (repo: string) => `scanner.watermark:${repo}`;
+const etagKey = (repo: string) => `scanner.etag:${repo}`;
+const lastScanKey = (repo: string) => `scanner.lastScanAt:${repo}`;
+const lastErrorKey = (repo: string) => `scanner.lastError:${repo}`;
 const maxPages = 15;
 
 export interface ScannerStatus {
+	repo: string;
 	lastScanAt: string | null;
 	lastError: string | null;
 }
 
-export function getScannerStatus(): ScannerStatus {
+export function getScannerStatus(repo: string): ScannerStatus {
 	return {
-		lastScanAt: getValue(lastScanKey),
-		lastError: getValue(lastErrorKey)
+		repo,
+		lastScanAt: getValue(lastScanKey(repo)),
+		lastError: getValue(lastErrorKey(repo))
 	};
 }
 
 // First run: every open PR. Later runs: anything updated since the watermark, closed PRs included
-async function collectUpdatedPullRequests(watermark: string | null): Promise<{
+async function collectUpdatedPullRequests(
+	repo: string,
+	watermark: string | null
+): Promise<{
 	pullRequests: PullRequestSummary[];
 	etag: string | null;
 } | null> {
@@ -48,9 +54,10 @@ async function collectUpdatedPullRequests(watermark: string | null): Promise<{
 
 	for (let page = 1; page <= maxPages; page += 1) {
 		const result = await listPullRequests({
+			repo,
 			state: watermark === null ? 'open' : 'all',
 			page,
-			etag: page === 1 && watermark !== null ? getValue(etagKey) : null
+			etag: page === 1 && watermark !== null ? getValue(etagKey(repo)) : null
 		});
 
 		if (result.notModified) {
@@ -81,12 +88,13 @@ async function collectUpdatedPullRequests(watermark: string | null): Promise<{
 }
 
 async function processPullRequest(pullRequest: PullRequestSummary): Promise<void> {
-	const previous = getPullRequestRow(pullRequest.number);
+	const { repo, number } = pullRequest;
+	const previous = getPullRequestRow(repo, number);
 
 	upsertPullRequest(pullRequest);
 
 	if (pullRequest.state !== 'open') {
-		retireFindings(pullRequest.number, 'The pull request was closed or merged.');
+		retireFindings(repo, number, 'The pull request was closed or merged.');
 		return;
 	}
 
@@ -94,7 +102,7 @@ async function processPullRequest(pullRequest: PullRequestSummary): Promise<void
 		previous !== null && previous.state === 'open' && previous.scannedSha === pullRequest.headSha;
 
 	// A fix can land without a commit (an edited description, a Vercel setting), so flagged PRs are rechecked on any update
-	const hasOpenFindings = listFindingsForPullRequest(pullRequest.number).some(
+	const hasOpenFindings = listFindingsForPullRequest(repo, number).some(
 		(finding) => finding.status === 'pending' || finding.status === 'actioned'
 	);
 
@@ -109,16 +117,16 @@ async function processPullRequest(pullRequest: PullRequestSummary): Promise<void
 
 	await dismissFixedChangeRequests(pullRequest, evaluation.violations);
 	reconcileFindings(pullRequest, evaluation.violations);
-	markPullRequestScanned(pullRequest.number, pullRequest.headSha);
+	markPullRequestScanned(repo, number, pullRequest.headSha);
 
 	if (evaluation.violations.length > 0) {
-		logger.info(`#${pullRequest.number}: ${evaluation.violations.length} violation(s)`);
+		logger.info(`${repo}#${number}: ${evaluation.violations.length} violation(s)`);
 	}
 }
 
-export async function scanOnce(): Promise<void> {
-	const watermark = getValue(watermarkKey);
-	const updated = await collectUpdatedPullRequests(watermark);
+export async function scanOnce(repo: string): Promise<void> {
+	const watermark = getValue(watermarkKey(repo));
+	const updated = await collectUpdatedPullRequests(repo, watermark);
 
 	if (updated === null) {
 		return;
@@ -138,30 +146,30 @@ export async function scanOnce(): Promise<void> {
 		} catch (error) {
 			if (!(error instanceof RateLimitError)) {
 				// One broken PR must not stall the queue; it is rechecked when it next changes
-				logger.error(`#${pullRequest.number} could not be evaluated; skipping`, error);
+				logger.error(`${repo}#${pullRequest.number} could not be evaluated; skipping`, error);
 				newWatermark = pullRequest.updatedAt;
 				continue;
 			}
 
 			if (newWatermark !== null) {
-				setValue(watermarkKey, newWatermark);
+				setValue(watermarkKey(repo), newWatermark);
 			}
 
 			// The list changed but was not fully handled, so the next poll must refetch it
-			deleteValue(etagKey);
+			deleteValue(etagKey(repo));
 
 			throw error;
 		}
 	}
 
 	if (newWatermark !== null) {
-		setValue(watermarkKey, newWatermark);
+		setValue(watermarkKey(repo), newWatermark);
 	} else {
-		setValue(watermarkKey, new Date().toISOString());
+		setValue(watermarkKey(repo), new Date().toISOString());
 	}
 
 	if (updated.etag) {
-		setValue(etagKey, updated.etag);
+		setValue(etagKey(repo), updated.etag);
 	}
 }
 
@@ -171,18 +179,22 @@ let stopped = false;
 async function runCycle(afterScan: () => Promise<void>): Promise<void> {
 	let delayMs = getConfig().pollIntervalSeconds * 1000;
 
-	try {
-		await scanOnce();
-		setValue(lastScanKey, new Date().toISOString());
-		deleteValue(lastErrorKey);
-	} catch (error) {
-		setValue(lastErrorKey, describeError(error));
+	for (const repo of getConfig().repos) {
+		try {
+			await scanOnce(repo);
+			setValue(lastScanKey(repo), new Date().toISOString());
+			deleteValue(lastErrorKey(repo));
+		} catch (error) {
+			setValue(lastErrorKey(repo), describeError(error));
 
-		if (error instanceof RateLimitError) {
-			delayMs = Math.max(delayMs, error.resumeAt - Date.now() + 5_000);
-			logger.warn(`Paused for ${Math.round(delayMs / 1000)}s`, error);
-		} else {
-			logger.error('Scan failed; will retry next cycle', error);
+			if (error instanceof RateLimitError) {
+				// One token serves every repository, so the rest would hit the same limit
+				delayMs = Math.max(delayMs, error.resumeAt - Date.now() + 5_000);
+				logger.warn(`Paused for ${Math.round(delayMs / 1000)}s`, error);
+				break;
+			}
+
+			logger.error(`Scan of ${repo} failed; will retry next cycle`, error);
 		}
 	}
 
@@ -195,7 +207,7 @@ async function runCycle(afterScan: () => Promise<void>): Promise<void> {
 
 export function startScanner(afterScan: () => Promise<void>): void {
 	stopped = false;
-	logger.info(`Polling every ${getConfig().pollIntervalSeconds}s`);
+	logger.info(`Polling ${getConfig().repos.join(', ')} every ${getConfig().pollIntervalSeconds}s`);
 
 	void runCycle(afterScan);
 }

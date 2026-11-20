@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	import ActionsChart from '#lib/components/ActionsChart.svelte';
-	import { formatTimestamp } from '#lib/labels.ts';
+	import { formatTimestamp, repoLabel } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
 
@@ -50,12 +50,14 @@
 	<ActionsChart daily={data.stats.daily} />
 </section>
 
-<p class="muted">
-	Last scan: {formatTimestamp(data.scanner.lastScanAt)}.
-	{#if data.scanner.lastError}
-		Last scan problem: {data.scanner.lastError}
-	{/if}
-</p>
+{#each data.scanners as scanner (scanner.repo)}
+	<p class="muted">
+		{repoLabel(scanner.repo)}: last scan {formatTimestamp(scanner.lastScanAt)}.
+		{#if scanner.lastError}
+			Last scan problem: {scanner.lastError}
+		{/if}
+	</p>
+{/each}
 
 <style>
 	.tiles {

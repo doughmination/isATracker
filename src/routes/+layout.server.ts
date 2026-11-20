@@ -2,7 +2,7 @@
  * MIT — (c) Doughmination System®
  */
 
-import { getConfig } from '#lib/server/config.ts';
+import { getConfig, readRepoFilter } from '#lib/server/config.ts';
 import { listOpenFindings } from '#lib/server/db/findings.ts';
 import { isPasswordConfigured } from '#lib/server/auth.ts';
 
@@ -10,10 +10,13 @@ import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = ({ url }) => {
 	const onLoginPage = url.pathname === '/login';
+	const repoFilter = readRepoFilter(url);
 
 	return {
 		dryRun: getConfig().dryRun,
-		pendingTotal: onLoginPage ? 0 : listOpenFindings().length,
+		repos: getConfig().repos,
+		repoFilter,
+		pendingTotal: onLoginPage ? 0 : listOpenFindings(repoFilter).length,
 		showNavigation: !onLoginPage,
 		canSignOut: isPasswordConfigured()
 	};

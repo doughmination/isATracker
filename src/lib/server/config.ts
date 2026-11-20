@@ -4,8 +4,8 @@
 
 export interface AppConfig {
 	githubToken: string;
-	repoOwner: string;
-	repoName: string;
+	// Each entry is owner/name
+	repos: string[];
 	discordToken: string;
 	discordUserId: string;
 	discordChannelId: string;
@@ -49,8 +49,10 @@ let cachedConfig: AppConfig | undefined;
 export function getConfig(): AppConfig {
 	cachedConfig ??= {
 		githubToken: readText('GITHUB_TOKEN'),
-		repoOwner: readText('GITHUB_REPO_OWNER', 'is-a-dev'),
-		repoName: readText('GITHUB_REPO_NAME', 'register'),
+		repos: readText('GITHUB_REPOS', 'is-a-dev/register,free-domains/is-a.bot')
+			.split(',')
+			.map((repo) => repo.trim())
+			.filter((repo) => repo !== ''),
 		discordToken: readText('DISCORD_BOT_TOKEN'),
 		discordUserId: readText('DISCORD_USER_ID'),
 		discordChannelId: readText('DISCORD_CHANNEL_ID'),
@@ -71,8 +73,13 @@ export function getConfig(): AppConfig {
 	return cachedConfig;
 }
 
-export function getRepoPath(): string {
-	const { repoOwner, repoName } = getConfig();
+export function getRepoPath(repo: string): string {
+	return `/repos/${repo}`;
+}
 
-	return `/repos/${repoOwner}/${repoName}`;
+// The dashboard's ?repo= filter; anything not configured means every repository
+export function readRepoFilter(url: URL): string | null {
+	const repo = url.searchParams.get('repo');
+
+	return repo !== null && getConfig().repos.includes(repo) ? repo : null;
 }

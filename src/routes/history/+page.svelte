@@ -7,6 +7,7 @@
 		actionLabels,
 		formatTimestamp,
 		labelFor,
+		repoLabel,
 		ruleLabels,
 		statusLabels
 	} from '#lib/labels.ts';
@@ -30,6 +31,9 @@
 		placeholder="PR number, contributor, rule, action or status"
 		aria-label="Search history"
 	/>
+	{#if data.repoFilter}
+		<input type="hidden" name="repo" value={data.repoFilter} />
+	{/if}
 	<button class="primary">Search</button>
 </form>
 
@@ -53,11 +57,12 @@
 					<tr>
 						<td>
 							<a
-								href={action.githubUrl ?? `${data.repoUrl}/pull/${action.prNumber}`}
+								href={action.githubUrl ??
+									`https://github.com/${action.repo}/pull/${action.prNumber}`}
 								target="_blank"
 								rel="noreferrer"
 							>
-								#{action.prNumber}
+								{repoLabel(action.repo)} #{action.prNumber}
 							</a>
 						</td>
 						<td>{action.contributor}</td>

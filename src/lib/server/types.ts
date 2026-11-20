@@ -13,6 +13,8 @@ export type ActionStatus = 'success' | 'failure' | 'skipped' | 'dryRun';
 export type FindingStatus = 'pending' | 'acting' | 'actioned' | 'ignored' | 'resolved' | 'prClosed';
 
 export interface PullRequestSummary {
+	// owner/name
+	repo: string;
 	number: number;
 	title: string;
 	author: string;
@@ -32,6 +34,7 @@ export interface PullRequestRow extends Omit<PullRequestSummary, 'body'> {
 
 export interface FindingRow {
 	id: number;
+	repo: string;
 	prNumber: number;
 	ruleId: RuleId;
 	filePath: string;
@@ -55,6 +58,7 @@ export interface FindingWithPullRequest extends FindingRow {
 export interface ActionRow {
 	id: number;
 	findingId: number | null;
+	repo: string;
 	prNumber: number;
 	contributor: string;
 	ruleId: RuleId;

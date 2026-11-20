@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { formatTimestamp, labelFor, ruleLabels, severityLabels } from '#lib/labels.ts';
+	import { formatTimestamp, labelFor, repoLabel, ruleLabels, severityLabels } from '#lib/labels.ts';
 
 	import type { PageProps } from './$types';
 
@@ -46,7 +46,9 @@
 {#each data.findings as finding (finding.id)}
 	<article class="card">
 		<h2>
-			<a href={finding.url} target="_blank" rel="noreferrer">#{finding.prNumber}</a>
+			<a href={finding.url} target="_blank" rel="noreferrer">
+				{repoLabel(finding.repo)} #{finding.prNumber}
+			</a>
 			{finding.title}
 		</h2>
 

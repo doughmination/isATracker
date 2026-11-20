@@ -34,7 +34,7 @@ export async function getContributorEligibility(
 		priority: boolean;
 	}
 ): Promise<ContributorEligibility> {
-	const { author, authorAssociation } = pullRequest;
+	const { repo, author, authorAssociation } = pullRequest;
 	const required = getConfig().nsMinMergedPullRequests;
 
 	if (maintainerAssociations.includes(authorAssociation)) {
@@ -51,7 +51,7 @@ export async function getContributorEligibility(
 		};
 	}
 
-	const cached = getContributor(author);
+	const cached = getContributor(repo, author);
 
 	if (cached && cached.mergedPrCount >= required) {
 		// Merged PRs never un-merge, so an eligible result is safe to keep
@@ -64,9 +64,9 @@ export async function getContributorEligibility(
 		return describe(author, cached.mergedPrCount, required);
 	}
 
-	const mergedPrCount = await countMergedPullRequests(author, options.priority);
+	const mergedPrCount = await countMergedPullRequests(repo, author, options.priority);
 
-	saveContributor(author, mergedPrCount);
+	saveContributor(repo, author, mergedPrCount);
 
 	return describe(author, mergedPrCount, required);
 }

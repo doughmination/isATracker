@@ -10,7 +10,8 @@ import { getConfig } from '../config.ts';
 
 const schema = `
 CREATE TABLE IF NOT EXISTS pullRequests (
-	number            INTEGER PRIMARY KEY,
+	repo              TEXT NOT NULL,
+	number            INTEGER NOT NULL,
 	title             TEXT NOT NULL,
 	author            TEXT NOT NULL,
 	authorAssociation TEXT NOT NULL,
@@ -19,12 +20,14 @@ CREATE TABLE IF NOT EXISTS pullRequests (
 	headSha           TEXT NOT NULL,
 	updatedAt         TEXT NOT NULL,
 	scannedSha        TEXT,
-	scannedAt         TEXT
+	scannedAt         TEXT,
+	PRIMARY KEY (repo, number)
 );
 
 CREATE TABLE IF NOT EXISTS findings (
 	id               INTEGER PRIMARY KEY AUTOINCREMENT,
-	prNumber         INTEGER NOT NULL REFERENCES pullRequests(number),
+	repo             TEXT NOT NULL,
+	prNumber         INTEGER NOT NULL,
 	ruleId           TEXT NOT NULL,
 	filePath         TEXT NOT NULL,
 	headSha          TEXT NOT NULL,
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS findings (
 	discordMessageId TEXT,
 	createdAt        TEXT NOT NULL,
 	updatedAt        TEXT NOT NULL,
-	UNIQUE (prNumber, ruleId, filePath)
+	FOREIGN KEY (repo, prNumber) REFERENCES pullRequests (repo, number),
+	UNIQUE (repo, prNumber, ruleId, filePath)
 );
 
 CREATE INDEX IF NOT EXISTS findingsByStatus ON findings (status);
@@ -44,6 +48,7 @@ CREATE INDEX IF NOT EXISTS findingsByStatus ON findings (status);
 CREATE TABLE IF NOT EXISTS actions (
 	id          INTEGER PRIMARY KEY AUTOINCREMENT,
 	findingId   INTEGER REFERENCES findings(id),
+	repo        TEXT NOT NULL,
 	prNumber    INTEGER NOT NULL,
 	contributor TEXT NOT NULL,
 	ruleId      TEXT NOT NULL,
@@ -58,9 +63,11 @@ CREATE TABLE IF NOT EXISTS actions (
 CREATE INDEX IF NOT EXISTS actionsByCreatedAt ON actions (createdAt);
 
 CREATE TABLE IF NOT EXISTS contributors (
-	login         TEXT PRIMARY KEY,
+	repo          TEXT NOT NULL,
+	login         TEXT NOT NULL,
 	mergedPrCount INTEGER NOT NULL,
-	checkedAt     TEXT NOT NULL
+	checkedAt     TEXT NOT NULL,
+	PRIMARY KEY (repo, login)
 );
 
 CREATE TABLE IF NOT EXISTS keyValue (
@@ -68,6 +75,66 @@ CREATE TABLE IF NOT EXISTS keyValue (
 	value TEXT NOT NULL
 );
 `;
+
+// Before multi-repo support, every row belonged to this repository
+export const legacyRepo = 'is-a-dev/register';
+
+const repoTables = ['pullRequests', 'findings', 'actions', 'contributors'];
+
+// Rebuilds the single-repo tables with a repo column; runs once, inside one transaction
+export function migrateToRepositories(connection: DatabaseSync): void {
+	const columns = connection.prepare('PRAGMA table_info(pullRequests)').all() as {
+		name: string;
+	}[];
+
+	const isLegacy = columns.length > 0 && !columns.some((column) => column.name === 'repo');
+
+	if (!isLegacy) {
+		return;
+	}
+
+	// Foreign keys cannot be switched inside a transaction, and would block the rebuild
+	connection.exec('PRAGMA foreign_keys = OFF;');
+	connection.exec('BEGIN;');
+
+	try {
+		for (const table of repoTables) {
+			connection.exec(`ALTER TABLE ${table} RENAME TO ${table}Legacy;`);
+		}
+
+		// Old index names would make the schema's CREATE INDEX IF NOT EXISTS a no-op
+		connection.exec('DROP INDEX IF EXISTS findingsByStatus;');
+		connection.exec('DROP INDEX IF EXISTS actionsByCreatedAt;');
+		connection.exec(schema);
+
+		for (const table of repoTables) {
+			const legacyColumns = (
+				connection.prepare(`PRAGMA table_info(${table}Legacy)`).all() as { name: string }[]
+			)
+				.map((column) => column.name)
+				.join(', ');
+
+			connection
+				.prepare(
+					`INSERT INTO ${table} (repo, ${legacyColumns})
+					 SELECT ?, ${legacyColumns} FROM ${table}Legacy`
+				)
+				.run(legacyRepo);
+
+			connection.exec(`DROP TABLE ${table}Legacy;`);
+		}
+
+		// Scanner state is now kept per repository
+		connection
+			.prepare(`UPDATE keyValue SET key = key || ':' || ? WHERE key LIKE 'scanner.%'`)
+			.run(legacyRepo);
+
+		connection.exec('COMMIT;');
+	} catch (error) {
+		connection.exec('ROLLBACK;');
+		throw error;
+	}
+}
 
 type NamedParameters = Record<string, SQLInputValue>;
 
@@ -131,8 +198,12 @@ export function getDatabase(): TrackerDatabase {
 		mkdirSync(dirname(databasePath), { recursive: true });
 	}
 
-	database = wrapDatabase(new DatabaseSync(databasePath));
-	database.exec('PRAGMA journal_mode = WAL;');
+	const connection = new DatabaseSync(databasePath);
+
+	connection.exec('PRAGMA journal_mode = WAL;');
+	migrateToRepositories(connection);
+
+	database = wrapDatabase(connection);
 	database.exec('PRAGMA foreign_keys = ON;');
 	database.exec(schema);
 
