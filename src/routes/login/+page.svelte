@@ -9,7 +9,7 @@
 </script>
 
 <svelte:head>
-	<title>Sign in · is-a-tracker</title>
+	<title>Sign in · isATracker</title>
 </svelte:head>
 
 <h1>Moderator sign in</h1>

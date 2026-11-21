@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-	<title>Lookup · is-a-tracker</title>
+	<title>Lookup · isATracker</title>
 </svelte:head>
 
 <h1>Manual PR lookup</h1>

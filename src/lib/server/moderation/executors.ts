@@ -87,10 +87,11 @@ async function closeWithPolicyComment(input: ExecutorInput): Promise<ActionOutco
 }
 
 function reviewMarker(finding: { ruleId: string; filePath: string }): string {
-	return `<!-- is-a-tracker:${finding.ruleId}:${finding.filePath} -->`;
+	return `<!-- isATracker:${finding.ruleId}:${finding.filePath} -->`;
 }
 
-const markerPattern = /<!-- is-a-tracker:([^:]+):(.+?) -->/g;
+// Recognize reviews posted before the project was renamed.
+const markerPattern = /<!-- (?:isATracker|is-a-tracker):([^:]+):(.+?) -->/g;
 
 function reviewMessages(finding: FindingRow) {
 	const messages = getMessages();
@@ -116,7 +117,9 @@ async function requestRuleChanges(input: ExecutorInput): Promise<ActionOutcome> 
 			review.user?.login === login &&
 			review.state === 'CHANGES_REQUESTED' &&
 			review.commit_id === headSha &&
-			markers.every((marker) => (review.body ?? '').includes(marker))
+			markers.every((marker) =>
+				(review.body ?? '').replaceAll('is-a-tracker:', 'isATracker:').includes(marker)
+			)
 	);
 
 	if (duplicate) {

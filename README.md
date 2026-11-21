@@ -1,4 +1,4 @@
-# is-a-tracker
+# isATracker
 
 A personal moderation assistant for pull requests on `is-a-dev/register` and
 `free-domains/is-a.bot`. Set the list in `GITHUB_REPOS` (comma separated, `owner/name`).
@@ -146,7 +146,7 @@ deno task lint
 The `deploy` folder is a runit service, laid out like the one in the `web` project.
 
 - `deploy/run` starts the built app as `clove` from `/srv/clove/isATracker` on port 3101.
-- `deploy/log/run` sends its output to `/var/log/is-a-tracker` through `svlogd`.
+- `deploy/log/run` sends its output to `/var/log/isATracker` through `svlogd`.
 
 The server folder needs `build/`, `node_modules/`, `config/`, `package.json` and `.env`.
 It also needs a `data/` folder that `clove` can write to; the SQLite file lives there.

@@ -120,7 +120,7 @@ function buildUrl(request: GitHubRequest): string {
 function buildHeaders(request: GitHubRequest): Headers {
 	const headers = new Headers({
 		Accept: request.accept ?? 'application/vnd.github+json',
-		'User-Agent': 'is-a-tracker',
+		'User-Agent': 'isATracker',
 		'X-GitHub-Api-Version': '2022-11-28'
 	});
 

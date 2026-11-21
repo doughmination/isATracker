@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>History · is-a-tracker</title>
+	<title>History · isATracker</title>
 </svelte:head>
 
 <h1>Moderation history</h1>

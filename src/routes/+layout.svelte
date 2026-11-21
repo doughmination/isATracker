@@ -40,7 +40,7 @@
 {#if data.showNavigation}
 	<header>
 		<nav class="page">
-			<strong>is-a-tracker</strong>
+			<strong>isATracker</strong>
 
 			{#each links.filter((link) => link.href !== '/pending' || data.authenticated) as link (link.href)}
 				<a href={link.href} aria-current={page.url.pathname === link.href ? 'page' : undefined}>

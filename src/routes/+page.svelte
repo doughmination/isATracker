@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-	<title>Overview · is-a-tracker</title>
+	<title>Overview · isATracker</title>
 </svelte:head>
 
 <h1>Moderation overview</h1>

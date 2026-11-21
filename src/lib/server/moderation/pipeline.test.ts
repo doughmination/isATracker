@@ -17,6 +17,8 @@ import { getModerationStats, searchActions } from '../db/auditLog.ts';
 import { listFindingsForPullRequest } from '../db/findings.ts';
 import { performModerationAction } from './actions.ts';
 import { scanOnce } from './scanner.ts';
+import { executors } from './executors.ts';
+import { getPullRequest } from '../github/pullRequests.ts';
 
 interface FakePullRequest {
 	number: number;
@@ -534,5 +536,38 @@ describe('moderation pipeline', () => {
 		assert.ok(
 			listFindingsForPullRequest(repo, 7).every((finding) => finding.status === 'actioned')
 		);
+	});
+
+	test('both review marker names prevent duplicate change requests', async () => {
+		const pullRequest = await getPullRequest(repo, 4);
+		const finding = findingFor(4);
+
+		for (const name of ['isATracker', 'is-a-tracker']) {
+			const review = {
+				method: 'POST',
+				path: '/pulls/4/reviews',
+				body: {
+					commit_id: pullRequest.headSha,
+					body: `<!-- ${name}:${finding.ruleId}:${finding.filePath} -->`
+				}
+			};
+
+			writes.push(review);
+
+			const outcome = await executors.requestChanges({
+				pullRequest,
+				findings: [finding],
+				evaluation: {
+					pullRequest,
+					files: [],
+					violations: [],
+					skippedFileCount: 0
+				}
+			});
+
+			assert.equal(outcome.status, 'skipped');
+			assert.equal(writes.at(-1), review);
+			writes.pop();
+		}
 	});
 });

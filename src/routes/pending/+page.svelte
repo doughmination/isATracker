@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-	<title>Pending · is-a-tracker</title>
+	<title>Pending · isATracker</title>
 </svelte:head>
 
 <h1>Pending reviews</h1>
