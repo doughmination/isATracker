@@ -64,8 +64,22 @@ export function describeToken(options: {
 
 // Runs once at startup so a bad token is reported then, not at the first button press
 export async function checkToken(): Promise<void> {
-	if (!getConfig().githubToken) {
-		logger.warn('GITHUB_TOKEN missing; reads are limited to 60 an hour and actions will fail');
+	const config = getConfig();
+
+	if (config.readGithubToken) {
+		try {
+			const reader = await githubRequest<{ login: string }>({ path: '/user' });
+
+			logger.info(`READ_GITHUB_TOKEN: signed in as ${reader.data.login}.`);
+		} catch (error) {
+			logger.error(`Could not verify READ_GITHUB_TOKEN: ${describeError(error)}`);
+		}
+	} else {
+		logger.warn('READ_GITHUB_TOKEN missing; public reads are limited to 60 an hour.');
+	}
+
+	if (!config.maintainerGithubToken) {
+		logger.warn('MAINTAINER_GITHUB_TOKEN missing; moderation actions will fail.');
 		return;
 	}
 
@@ -90,10 +104,10 @@ export async function checkToken(): Promise<void> {
 			});
 
 			for (const line of report.lines) {
-				logger[report.level](`${repo}: ${line}`);
+				logger[report.level](`MAINTAINER_GITHUB_TOKEN ${repo}: ${line}`);
 			}
 		}
 	} catch (error) {
-		logger.error(`Could not verify GITHUB_TOKEN: ${describeError(error)}`);
+		logger.error(`Could not verify MAINTAINER_GITHUB_TOKEN: ${describeError(error)}`);
 	}
 }

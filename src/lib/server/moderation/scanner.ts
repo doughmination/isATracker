@@ -188,7 +188,7 @@ async function runCycle(afterScan: () => Promise<void>): Promise<void> {
 			setValue(lastErrorKey(repo), describeError(error));
 
 			if (error instanceof RateLimitError) {
-				// One token serves every repository, so the rest would hit the same limit
+				// The read token serves every repository, so the rest would hit the same limit
 				delayMs = Math.max(delayMs, error.resumeAt - Date.now() + 5_000);
 				logger.warn(`Paused for ${Math.round(delayMs / 1000)}s`, error);
 				break;

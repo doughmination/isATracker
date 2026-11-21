@@ -3,7 +3,8 @@
  */
 
 export interface AppConfig {
-	githubToken: string;
+	readGithubToken: string;
+	maintainerGithubToken: string;
 	// Each entry is owner/name
 	repos: string[];
 	discordToken: string;
@@ -47,8 +48,15 @@ function readFlag(name: string, fallback: boolean): boolean {
 let cachedConfig: AppConfig | undefined;
 
 export function getConfig(): AppConfig {
-	cachedConfig ??= {
-		githubToken: readText('GITHUB_TOKEN'),
+	if (cachedConfig) {
+		return cachedConfig;
+	}
+
+	const maintainerGithubToken = readText('MAINTAINER_GITHUB_TOKEN', readText('GITHUB_TOKEN'));
+
+	cachedConfig = {
+		readGithubToken: readText('READ_GITHUB_TOKEN', maintainerGithubToken),
+		maintainerGithubToken,
 		repos: readText('GITHUB_REPOS', 'is-a-dev/register,free-domains/is-a.bot')
 			.split(',')
 			.map((repo) => repo.trim())

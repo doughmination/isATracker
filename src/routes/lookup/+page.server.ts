@@ -34,7 +34,7 @@ function parsePullRequest(
 }
 
 // Read-only: fetches and validates live, and stores nothing
-export const load: PageServerLoad = async ({ url, locals }) => {
+export const load: PageServerLoad = async ({ url }) => {
 	const query = url.searchParams.get('pr') ?? '';
 
 	if (query.trim() === '') {
@@ -68,11 +68,11 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	}
 
 	try {
-		const pullRequest = await getPullRequest(repo, number, locals.authenticated);
+		const pullRequest = await getPullRequest(repo, number);
 
 		const evaluation = await evaluatePullRequest(pullRequest, {
 			fresh: true,
-			priority: locals.authenticated
+			priority: false
 		});
 
 		return {

@@ -34,9 +34,27 @@ interface RateBucket {
 	resetAt: number;
 }
 
-const rateBuckets = new Map<string, RateBucket>();
+interface RateState {
+	buckets: Map<string, RateBucket>;
+	blockedUntil: number;
+}
 
-let blockedUntil = 0;
+// Key by credential so the single-token fallback shares its budget and cooldown.
+const rateStates = new Map<string, RateState>();
+
+function getRateState(token: string): RateState {
+	let state = rateStates.get(token);
+
+	if (!state) {
+		state = {
+			buckets: new Map(),
+			blockedUntil: 0
+		};
+		rateStates.set(token, state);
+	}
+
+	return state;
+}
 
 export interface GitHubRequest {
 	method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
@@ -45,7 +63,7 @@ export interface GitHubRequest {
 	body?: unknown;
 	accept?: string;
 	etag?: string | null;
-	// Moderator-approved actions may spend the reserve kept back from the scanner
+	// Actions and their safety checks use the maintainer token and its reserved quota
 	priority?: boolean;
 }
 
@@ -71,20 +89,24 @@ function readScopes(headers: Headers): string[] | null {
 		.filter((scope) => scope !== '');
 }
 
-function assertWithinRateLimit(resource: string, priority: boolean): void {
+function assertWithinRateLimit(state: RateState, resource: string, priority: boolean): void {
 	const now = Date.now();
 
-	if (now < blockedUntil) {
-		throw new RateLimitError(blockedUntil);
+	if (now < state.blockedUntil) {
+		throw new RateLimitError(state.blockedUntil);
 	}
 
-	const bucket = rateBuckets.get(resource);
+	const bucket = state.buckets.get(resource);
 
 	if (!bucket || now >= bucket.resetAt) {
 		return;
 	}
 
-	const scannerReserve = Math.min(getConfig().rateLimitReserve, Math.floor(bucket.limit * 0.1));
+	const config = getConfig();
+	const sharedToken = config.readGithubToken === config.maintainerGithubToken;
+	const scannerReserve = sharedToken
+		? Math.min(config.rateLimitReserve, Math.floor(bucket.limit * 0.1))
+		: 0;
 	const floor = priority ? 0 : scannerReserve;
 
 	if (bucket.remaining <= floor) {
@@ -92,7 +114,7 @@ function assertWithinRateLimit(resource: string, priority: boolean): void {
 	}
 }
 
-function recordRateLimit(headers: Headers, fallbackResource: string): void {
+function recordRateLimit(state: RateState, headers: Headers, fallbackResource: string): void {
 	const remaining = headers.get('x-ratelimit-remaining');
 	const reset = headers.get('x-ratelimit-reset');
 
@@ -100,7 +122,7 @@ function recordRateLimit(headers: Headers, fallbackResource: string): void {
 		return;
 	}
 
-	rateBuckets.set(headers.get('x-ratelimit-resource') ?? fallbackResource, {
+	state.buckets.set(headers.get('x-ratelimit-resource') ?? fallbackResource, {
 		limit: Number(headers.get('x-ratelimit-limit') ?? 0),
 		remaining: Number(remaining),
 		resetAt: Number(reset) * 1000
@@ -117,17 +139,15 @@ function buildUrl(request: GitHubRequest): string {
 	return url.toString();
 }
 
-function buildHeaders(request: GitHubRequest): Headers {
+function buildHeaders(request: GitHubRequest, token: string): Headers {
 	const headers = new Headers({
 		Accept: request.accept ?? 'application/vnd.github+json',
 		'User-Agent': 'isATracker',
 		'X-GitHub-Api-Version': '2022-11-28'
 	});
 
-	const { githubToken } = getConfig();
-
-	if (githubToken) {
-		headers.set('Authorization', `Bearer ${githubToken}`);
+	if (token) {
+		headers.set('Authorization', `Bearer ${token}`);
 	}
 
 	if (request.etag) {
@@ -156,16 +176,27 @@ async function readErrorMessage(response: Response): Promise<string> {
 async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Data>> {
 	const resource = request.path.startsWith('/search') ? 'search' : 'core';
 
-	assertWithinRateLimit(resource, request.priority ?? false);
+	const config = getConfig();
+	const isWrite = (request.method ?? 'GET') !== 'GET';
+	const maintainer = isWrite || request.priority === true;
+	const token = maintainer ? config.maintainerGithubToken : config.readGithubToken;
+
+	if (maintainer && !token) {
+		throw new GitHubError(401, 'Set MAINTAINER_GITHUB_TOKEN to perform moderation actions.');
+	}
+
+	const state = getRateState(token);
+
+	assertWithinRateLimit(state, resource, maintainer);
 
 	const response = await fetch(buildUrl(request), {
 		method: request.method ?? 'GET',
-		headers: buildHeaders(request),
+		headers: buildHeaders(request, token),
 		body: request.body === undefined ? undefined : JSON.stringify(request.body),
 		signal: AbortSignal.timeout(requestTimeoutMs)
 	});
 
-	recordRateLimit(response.headers, resource);
+	recordRateLimit(state, response.headers, resource);
 
 	const etag = response.headers.get('etag');
 
@@ -182,11 +213,23 @@ async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Da
 	const retryAfter = Number(response.headers.get('retry-after') ?? 0);
 	const exhausted = response.headers.get('x-ratelimit-remaining') === '0';
 
-	if ((response.status === 403 || response.status === 429) && (retryAfter > 0 || exhausted)) {
-		const resetAt = Number(response.headers.get('x-ratelimit-reset') ?? 0) * 1000;
-		const resumeAt = retryAfter > 0 ? Date.now() + retryAfter * 1000 : resetAt;
+	const errorMessage = response.ok ? '' : await readErrorMessage(response);
+	const secondaryLimit = /secondary rate limit|abuse detection/i.test(errorMessage);
 
-		blockedUntil = Math.max(blockedUntil, resumeAt);
+	if (
+		response.status === 429 ||
+		(response.status === 403 && (retryAfter > 0 || exhausted || secondaryLimit))
+	) {
+		const resetAt = Number(response.headers.get('x-ratelimit-reset') ?? 0) * 1000;
+		const resumeAt = Math.max(
+			retryAfter > 0 ? Date.now() + retryAfter * 1000 : 0,
+			exhausted ? resetAt : 0,
+			retryAfter <= 0 && !exhausted ? Date.now() + 60_000 : 0
+		);
+
+		if (retryAfter > 0 || secondaryLimit || !exhausted) {
+			state.blockedUntil = Math.max(state.blockedUntil, resumeAt);
+		}
 
 		throw new RateLimitError(resumeAt);
 	}
@@ -199,7 +242,7 @@ async function sendOnce<Data>(request: GitHubRequest): Promise<GitHubResponse<Da
 	}
 
 	if (!response.ok) {
-		throw new GitHubError(response.status, await readErrorMessage(response));
+		throw new GitHubError(response.status, errorMessage);
 	}
 
 	const isJson = (response.headers.get('content-type') ?? '').includes('json');
@@ -248,6 +291,11 @@ export async function githubRequest<Data>(request: GitHubRequest): Promise<GitHu
 	}
 }
 
-export function getRateLimitSnapshot(): Record<string, RateBucket> {
-	return Object.fromEntries(rateBuckets);
+export function getRateLimitSnapshot() {
+	const config = getConfig();
+
+	return {
+		read: Object.fromEntries(getRateState(config.readGithubToken).buckets),
+		maintainer: Object.fromEntries(getRateState(config.maintainerGithubToken).buckets)
+	};
 }

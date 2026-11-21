@@ -9,8 +9,8 @@ repository picker.
 
 Overview (`/`), History, and Lookup are public. Overview shows moderation totals,
 the 30-day chart, pending finding counts, and scanner health. Pending reviews and
-moderation actions require the existing password login. Public lookups respect the
-GitHub quota reserve held back for moderation. Raw scanner errors are only included for signed-in moderators.
+moderation actions require the existing password login. Public lookups use the read token; moderation actions and their safety checks use
+the maintainer token. Raw scanner errors are only included for signed-in moderators.
 Signing in opens Pending; signing out returns to the public overview.
 Without `DASHBOARD_PASSWORD`, moderation stays unavailable in production.
 
@@ -38,25 +38,42 @@ One Deno process runs the scanner, the Discord bot, and the SvelteKit dashboard.
 ## Setup
 
 1. Copy the example settings: `cp .env.example .env`
-2. Fill in `GITHUB_TOKEN`, `DISCORD_BOT_TOKEN`, `DISCORD_USER_ID` and `DASHBOARD_PASSWORD`
+2. Fill in `READ_GITHUB_TOKEN`, `MAINTAINER_GITHUB_TOKEN`, the Discord settings and `DASHBOARD_PASSWORD`
 3. Install: `deno install`
 4. Develop: `deno task dev`
 5. Or run for real: `deno task build`, then `deno task start`
 
-### GitHub token
+### GitHub tokens
 
-Use a **classic** personal access token. Fine-grained tokens cannot select the tracked
-repositories unless their organisations allow it.
+Use two **classic** personal access tokens from <https://github.com/settings/tokens>:
 
-1. Open <https://github.com/settings/tokens> and choose **Tokens (classic)**.
-2. Generate a new token and tick only **`public_repo`**.
-3. Paste it into `GITHUB_TOKEN`.
+- `READ_GITHUB_TOKEN`: your alt account's token, with **no scopes** for public repository reads.
+  Scanning and Lookup use this token, including lookups made while signed in.
+- `MAINTAINER_GITHUB_TOKEN`: your maintainer account's token, with only **`public_repo`**.
+  Comments, reviews, closures, dismissals, and action revalidation use this account.
+  The review author identity is always checked using this token.
 
-- A classic token reaches every public repository your account can write to. The tool only
-  ever calls the repositories set in `GITHUB_REPOS`.
-- At startup the tool checks the token and logs its account, its scopes, and whether that
-  account may close pull requests on each repository.
-- If the organisation enforces single sign-on, authorise the token under **Configure SSO**.
+Keep both in `.env`, never in source or a commit. The alt needs no repository write access.
+At startup, the tool logs each token's account and checks the maintainer's permissions on
+all configured repositories. If an organisation uses SSO, authorise the maintainer token
+under **Configure SSO**.
+
+Existing `GITHUB_TOKEN` settings remain a fallback for `MAINTAINER_GITHUB_TOKEN`.
+If `READ_GITHUB_TOKEN` is empty, reads use that same maintainer credential and retain the
+existing quota reserve. A read-only setup can scan without a maintainer token, but cannot
+perform moderation actions. An exhausted or invalid read token never falls back to the
+maintainer token.
+
+Distinct accounts have their own primary quota; multiple tokens for the same account
+share that account's quota. GitHub normally allows 5,000 authenticated REST requests per
+hour per account, with tighter search and secondary limits. The tool tracks response
+headers and pauses when throttled; it does not rotate tokens to evade a limit.
+See [GitHub's rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
+
+To check more often, set `POLL_INTERVAL_SECONDS=30` in `.env` and restart. The default
+remains 120 seconds, and the minimum is 30. Each cycle waits this interval after its work
+finishes; rate-limit backoff can extend the wait. Faster polling does not increase GitHub's
+quota, and large scans or frequent public lookups can still exhaust the read account.
 
 ### Discord bot
 
@@ -121,7 +138,8 @@ the other open violations on the same PR.
 - A finding can only be claimed once, so two clicks never post twice.
 - Writes to GitHub are never retried automatically.
 - Statistics count successful actions only. Every attempt lands in the audit log.
-- The scanner keeps a reserve of the GitHub rate limit free for your approved actions.
+- Scan and lookup traffic uses the read credential; moderation uses the maintainer credential.
+- When both roles share one credential, scanning preserves a reserve for approved actions.
 
 ## Adding a rule
 
