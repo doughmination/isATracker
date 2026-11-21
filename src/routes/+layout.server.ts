@@ -8,7 +8,7 @@ import { isPasswordConfigured } from '#lib/server/auth.ts';
 
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = ({ url }) => {
+export const load: LayoutServerLoad = ({ url, locals }) => {
 	const onLoginPage = url.pathname === '/login';
 	const repoFilter = readRepoFilter(url);
 
@@ -18,6 +18,7 @@ export const load: LayoutServerLoad = ({ url }) => {
 		repoFilter,
 		pendingTotal: onLoginPage ? 0 : listOpenFindings().length,
 		showNavigation: !onLoginPage,
-		canSignOut: isPasswordConfigured()
+		authenticated: locals.authenticated,
+		canSignOut: locals.authenticated && isPasswordConfigured()
 	};
 };

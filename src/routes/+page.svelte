@@ -35,7 +35,13 @@
 	<title>Overview · is-a-tracker</title>
 </svelte:head>
 
-<h1>Overview</h1>
+<h1>Moderation overview</h1>
+
+<p class="muted">
+	Public statistics for pull request moderation across the tracked repositories. Action totals cover
+	all time; the chart shows the last 30 days. Pending items are individual findings, so one pull
+	request can have several.
+</p>
 
 <RepoFilter repos={data.repos} current={data.repoFilter} />
 
@@ -58,6 +64,8 @@
 		{repoLabel(scanner.repo)}: last scan {formatTimestamp(scanner.lastScanAt)}.
 		{#if scanner.lastError}
 			Last scan problem: {scanner.lastError}
+		{:else if scanner.hasError}
+			The scanner is experiencing a problem.
 		{/if}
 	</p>
 {/each}

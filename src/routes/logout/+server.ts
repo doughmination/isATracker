@@ -9,5 +9,5 @@ import { sessionCookieName } from '#lib/server/auth.ts';
 export const POST: RequestHandler = ({ cookies }) => {
 	cookies.delete(sessionCookieName, { path: '/' });
 
-	redirect(303, '/login');
+	redirect(303, '/');
 };

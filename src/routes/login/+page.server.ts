@@ -18,8 +18,12 @@ import type { Actions, PageServerLoad } from './$types';
 const sessionLengthSeconds = 60 * 60 * 24 * 30;
 
 export const load: PageServerLoad = ({ cookies }) => {
-	if (!isPasswordConfigured() || isSessionValid(cookies.get(sessionCookieName))) {
+	if (!isPasswordConfigured()) {
 		redirect(303, '/');
+	}
+
+	if (isSessionValid(cookies.get(sessionCookieName))) {
+		redirect(303, '/pending');
 	}
 };
 
@@ -43,6 +47,6 @@ export const actions: Actions = {
 			maxAge: sessionLengthSeconds
 		});
 
-		redirect(303, '/');
+		redirect(303, '/pending');
 	}
 };

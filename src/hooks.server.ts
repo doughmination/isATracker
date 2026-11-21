@@ -17,12 +17,15 @@ export const init: ServerInit = async () => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname === '/login') {
+	event.locals.authenticated =
+		isSessionValid(event.cookies.get(sessionCookieName)) || (dev && !isPasswordConfigured());
+
+	if (['/', '/history', '/lookup', '/login'].includes(event.route.id ?? '')) {
 		return resolve(event);
 	}
 
 	if (!isPasswordConfigured()) {
-		// Without a password the dashboard only opens on the local dev server
+		// Without a password, moderation only opens on the local dev server
 		if (dev) {
 			return resolve(event);
 		}
@@ -30,7 +33,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return new Response('Set DASHBOARD_PASSWORD to use the dashboard.', { status: 503 });
 	}
 
-	if (!isSessionValid(event.cookies.get(sessionCookieName))) {
+	if (!event.locals.authenticated) {
 		redirect(303, '/login');
 	}
 

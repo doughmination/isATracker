@@ -12,7 +12,10 @@
 	<title>Sign in · is-a-tracker</title>
 </svelte:head>
 
-<h1>is-a-tracker</h1>
+<h1>Moderator sign in</h1>
+
+<p class="muted">Sign in to review pending findings and access moderation tools.</p>
+<p><a href="/">View public statistics</a></p>
 
 {#if form?.problem}
 	<p class="notice failure" role="alert">{form.problem}</p>

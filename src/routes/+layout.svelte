@@ -42,7 +42,7 @@
 		<nav class="page">
 			<strong>is-a-tracker</strong>
 
-			{#each links as link (link.href)}
+			{#each links.filter((link) => link.href !== '/pending' || data.authenticated) as link (link.href)}
 				<a href={link.href} aria-current={page.url.pathname === link.href ? 'page' : undefined}>
 					{link.label}
 					{#if link.href === '/pending' && data.pendingTotal > 0}
@@ -61,6 +61,8 @@
 				<form method="POST" action="/logout">
 					<button>Sign out</button>
 				</form>
+			{:else if !data.authenticated}
+				<a href="/login">Moderator sign in</a>
 			{/if}
 		</nav>
 	</header>

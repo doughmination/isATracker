@@ -7,6 +7,13 @@ The dashboard combines every repository. Use the **All / is-a.dev / is-a.bot** f
 on Overview, Pending and History to narrow that page to one repository. Lookup has its own
 repository picker.
 
+Overview (`/`), History, and Lookup are public. Overview shows moderation totals,
+the 30-day chart, pending finding counts, and scanner health. Pending reviews and
+moderation actions require the existing password login. Public lookups respect the
+GitHub quota reserve held back for moderation. Raw scanner errors are only included for signed-in moderators.
+Signing in opens Pending; signing out returns to the public overview.
+Without `DASHBOARD_PASSWORD`, moderation stays unavailable in production.
+
 It detects the violations below, pings you on Discord, and acts **only** when you press a button.
 
 | Violation                                                | Button          | What the button does                                 |

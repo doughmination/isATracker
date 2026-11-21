@@ -18,7 +18,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"test:access": "npm run build && node --test tests/access.test.mjs && ACCESS_TEST_PASSWORD= node --test tests/access.test.mjs"
 	},
 	"dependencies": {
 		"discord.js": "^14.28.1",
