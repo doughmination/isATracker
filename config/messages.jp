@@ -1,4 +1,4 @@
-# config/messages.jp
+~~ config/messages.jp
 
 [nsRecords]
 closeComment: "Thanks for your interest in {service}!\n\nThis pull request requests `NS` records. We do not grant nameserver records to first-time contributors, so I am closing this pull request.\n\nYou are welcome to open a new pull request using other record types, such as `A`, `AAAA`, `CNAME`, `MX` or `TXT`. Once you have an accepted registration, you can request `NS` records with a clear justification for why they are needed.\n\nPlease see the [Docs](https://docs.is-a.dev/faq/#who-can-use-ns-records) for more information.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"

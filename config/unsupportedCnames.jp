@@ -1,5 +1,5 @@
-# config/unsupportedCnames.jp
-# A CNAME matches an entry or any subdomain of it
+~~ config/unsupportedCnames.jp
+~~ A CNAME matches an entry or any subdomain of it
 
 hosts: [
   ".adult",
