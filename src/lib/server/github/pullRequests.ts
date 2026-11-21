@@ -209,6 +209,19 @@ export async function createIssueComment(
 	return response.data;
 }
 
+export async function addIssueLabels(
+	repo: string,
+	number: number,
+	labels: string[]
+): Promise<void> {
+	await githubRequest({
+		method: 'POST',
+		path: `${getRepoPath(repo)}/issues/${number}/labels`,
+		body: { labels },
+		priority: true
+	});
+}
+
 export async function closePullRequest(repo: string, number: number): Promise<void> {
 	await githubRequest({
 		method: 'PATCH',

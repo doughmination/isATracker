@@ -39,7 +39,7 @@ interface Resolution {
 }
 
 function chooseAction(findings: FindingRow[]): Exclude<ActionType, 'ignore'> {
-	// NS closes the PR, which settles every other issue with it
+	// A closure settles every other issue on the PR
 	return findings.some((finding) => getRule(finding.ruleId).actionType === 'closePr')
 		? 'closePr'
 		: 'requestChanges';

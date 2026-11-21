@@ -10,6 +10,7 @@ import { emitFindingEvent } from '../events.ts';
 import { getCommentableLines } from '../github/diff.ts';
 import { GitHubError } from '../github/client.ts';
 import {
+	addIssueLabels,
 	closePullRequest,
 	createChangesRequestedReview,
 	createIssueComment,
@@ -53,21 +54,35 @@ function findingKey(item: { ruleId: string; filePath: string }): string {
 async function closeWithPolicyComment(input: ExecutorInput): Promise<ActionOutcome> {
 	const { pullRequest, findings } = input;
 	const { repo, number } = pullRequest;
-	const nsFinding = findings.find((finding) => getRule(finding.ruleId).actionType === 'closePr');
+	const closingFinding =
+		findings.find((finding) => finding.ruleId === 'unsupportedCname') ??
+		findings.find((finding) => getRule(finding.ruleId).actionType === 'closePr');
 
-	if (!nsFinding) {
+	if (!closingFinding) {
 		throw new Error('Closing needs a closePr finding.');
 	}
 
+	const unsupported = closingFinding.ruleId === 'unsupportedCname';
+
+	if (unsupported) {
+		await addIssueLabels(repo, number, ['status: denied', 'reason: incompatible records']);
+	}
+
 	// A stored comment id means an earlier attempt already explained; never explain twice
-	if (nsFinding.commentId === null) {
+	if (closingFinding.commentId === null) {
 		const comment = await createIssueComment(
 			repo,
 			number,
-			fillWording(getMessages().nsRecords.closeComment, repo, nsFinding.filePath)
+			fillWording(
+				unsupported
+					? getMessages().unsupportedCname.closeComment
+					: getMessages().nsRecords.closeComment,
+				repo,
+				closingFinding.filePath
+			)
 		);
 
-		setFindingComment(nsFinding.id, comment.id);
+		setFindingComment(closingFinding.id, comment.id);
 	}
 
 	await closePullRequest(repo, number);
@@ -80,7 +95,9 @@ async function closeWithPolicyComment(input: ExecutorInput): Promise<ActionOutco
 	return {
 		status: 'success',
 		summary:
-			`Closed #${number} with the NS policy explanation` +
+			(unsupported
+				? `Closed #${number}: denied, incompatible records (unsupported host)`
+				: `Closed #${number} with the NS policy explanation`) +
 			(others > 0 ? `, settling ${others} other issue(s) with it.` : '.'),
 		githubUrl: pullRequest.url
 	};
@@ -230,7 +247,9 @@ export async function dismissFixedChangeRequests(
 	const fixed = listFindingsForPullRequest(repo, number).filter(
 		(finding) =>
 			finding.status === 'actioned' &&
-			getRule(finding.ruleId).actionType === 'requestChanges' &&
+			// Older unsupported-host findings may still have a change-request review.
+			(getRule(finding.ruleId).actionType === 'requestChanges' ||
+				finding.ruleId === 'unsupportedCname') &&
 			!stillViolated.has(findingKey(finding))
 	);
 

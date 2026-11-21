@@ -7,6 +7,7 @@ closeComment: "Thanks for your interest in {service}!\n\nThis pull request reque
 reviewSummary: "This pull request has a few things to fix. Please see the comments below.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 
 [unsupportedCname]
+closeComment: "This CNAME target is unsupported.\n\nDenied: incompatible records.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"
 reviewComment: "Your `CNAME` record points at a host that we do not support. Please point it at a supported host, or use another record type such as `A` or `AAAA`.\n\nIf you have requested a CloudFlare Worker, please use a legacy CloudFlare Pages project."
 reviewDismissal: "Thanks, the `CNAME` record is fixed. Dismissing the requested changes."
 reviewSummary: "Please see the inline comment on `CNAME`.\n<sub>This comment was sent with an [automated tool](https://doughmination.gay/automated), and approved by a human. I do not see replies.</sub>"

@@ -24,7 +24,7 @@ export type ModerationMessages = {
 	combined: {
 		reviewSummary: string;
 	};
-	unsupportedCname: ReviewMessages;
+	unsupportedCname: ReviewMessages & { closeComment: string };
 	noReplyEmail: ReviewMessages;
 	vercelLogin: ReviewMessages;
 	vercelFileName: ReviewMessages;

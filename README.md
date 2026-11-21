@@ -16,19 +16,20 @@ Without `DASHBOARD_PASSWORD`, moderation stays unavailable in production.
 
 It detects the violations below, pings you on Discord, and acts **only** when you press a button.
 
-| Violation                                                | Button          | What the button does                                 |
-| -------------------------------------------------------- | --------------- | ---------------------------------------------------- |
-| NS records from a first-time contributor                 | Close PR        | Posts the policy comment, then closes the PR         |
-| `CNAME` to an unsupported host                           | Request Changes | Submits a review with an inline comment on that line |
-| Vercel preview redirects to the Vercel login             | Request Changes | Submits a review explaining Deployment Protection    |
-| `owner.email` is a GitHub no-reply address               | Request Changes | Submits a review with an inline comment on that line |
-| `_vercel.www.alice.json` instead of `_vercel.alice.json` | Request Changes | Asks for the file to be renamed to the right name    |
-| `vc-domain-verify=` TXT inside `alice.json`              | Request Changes | Asks for it to move to `_vercel.alice.json`          |
+| Violation                                                | Button          | What the button does                                                           |
+| -------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------ |
+| NS records from a first-time contributor                 | Close PR        | Posts the policy comment, then closes the PR                                   |
+| `CNAME` to an unsupported host                           | Close PR        | Explains the unsupported host, labels denied/incompatible records, then closes |
+| Vercel preview redirects to the Vercel login             | Request Changes | Submits a review explaining Deployment Protection                              |
+| `owner.email` is a GitHub no-reply address               | Request Changes | Submits a review with an inline comment on that line                           |
+| `_vercel.www.alice.json` instead of `_vercel.alice.json` | Request Changes | Asks for the file to be renamed to the right name                              |
+| `vc-domain-verify=` TXT inside `alice.json`              | Request Changes | Asks for it to move to `_vercel.alice.json`                                    |
 
 Each pull request gets **one** Discord message and one dashboard card listing every issue on it,
 with one button for all of them:
 
-- With NS records on the PR, the button closes it, which settles every other issue too.
+- With NS records or an unsupported CNAME on the PR, the button closes it, settling every issue.
+- Unsupported CNAME closures add `status: denied` and `reason: incompatible records`.
 - Otherwise it submits one review: an inline comment per issue where GitHub allows one, the
   rest in the review body. That review is dismissed once every issue in it is fixed.
 - **Ignore** ignores every pending issue on the PR.
@@ -103,7 +104,9 @@ Once a contributor fixes a change request, the next scan dismisses that review w
 
 List hosts in `config/unsupportedCnames.jp` under `hosts`, for example
 `hosts: ["vercel.app", "example.com"]`. A CNAME matches an entry or any subdomain of it.
-Changes apply on the next scan. An empty list turns the rule off.
+Changes apply on the next scan. An empty list turns the rule off. Approving a finding posts
+a short unsupported-host explanation, adds `status: denied` and `reason: incompatible records`,
+and closes the PR instead of requesting changes.
 
 ## Vercel previews behind a login
 

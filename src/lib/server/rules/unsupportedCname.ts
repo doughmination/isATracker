@@ -81,8 +81,8 @@ export const unsupportedCnameRule: Rule = {
 	id: 'unsupportedCname',
 	title: 'CNAME to an unsupported host',
 	severity: 2,
-	actionType: 'requestChanges',
-	actionLabel: 'Request Changes',
+	actionType: 'closePr',
+	actionLabel: 'Close PR',
 
 	findLine: (file: DomainFile) => findCnameLine(file.content),
 

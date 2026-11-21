@@ -11,7 +11,7 @@
     "npm:eslint-plugin-svelte@^3.24.1": "3.24.1_eslint@10.15.0_svelte@5.58.1",
     "npm:eslint@^10.15.0": "10.15.0",
     "npm:globals@^17.14.0": "17.14.0",
-    "npm:jpcl-lang@^1.2.0": "1.2.0",
+    "npm:jpcl-lang@2": "2.0.0",
     "npm:prettier-plugin-svelte@^4.2.0": "4.2.0_prettier@3.10.1_svelte@5.58.1",
     "npm:prettier@^3.10.1": "3.10.1",
     "npm:svelte-check@^4.7.8": "4.7.8_svelte@5.58.1_typescript@6.0.3",
@@ -867,8 +867,8 @@
     "isexe@2.0.0": {
       "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="
     },
-    "jpcl-lang@1.2.0": {
-      "integrity": "sha512-ChlK4ZdPq8Tp/+TQazJqE+HztDIiPS98h5F4EvNns662lt3/r7754ye7cthypODvsAketUcaTthUHgzm1OWrlw==",
+    "jpcl-lang@2.0.0": {
+      "integrity": "sha512-n99Fj10ntxhu83lcnhgIZ/PAMwSgs4zpamOM73Uy5gtCQlvBYIkEnGFIxwTGGRo+zvh+oY4W7RNFErNxF9uuAQ==",
       "bin": true
     },
     "json-schema-traverse@0.4.1": {
@@ -1351,7 +1351,7 @@
         "npm:eslint-plugin-svelte@^3.24.1",
         "npm:eslint@^10.15.0",
         "npm:globals@^17.14.0",
-        "npm:jpcl-lang@^1.2.0",
+        "npm:jpcl-lang@2",
         "npm:prettier-plugin-svelte@^4.2.0",
         "npm:prettier@^3.10.1",
         "npm:svelte-check@^4.7.8",

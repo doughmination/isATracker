@@ -14,7 +14,7 @@ const repo = 'is-a-dev/register';
 
 import { getConfig } from '../config.ts';
 import { getModerationStats, searchActions } from '../db/auditLog.ts';
-import { listFindingsForPullRequest } from '../db/findings.ts';
+import { listFindingsForPullRequest, setFindingStatus } from '../db/findings.ts';
 import { performModerationAction } from './actions.ts';
 import { scanOnce } from './scanner.ts';
 import { executors } from './executors.ts';
@@ -36,6 +36,7 @@ interface RecordedWrite {
 	path: string;
 	body: {
 		state?: string;
+		labels?: string[];
 		event?: string;
 		body?: string;
 		commit_id?: string;
@@ -69,6 +70,7 @@ const noReplyJson = {
 
 const fakePullRequests = new Map<number, FakePullRequest>();
 const writes: RecordedWrite[] = [];
+let failNextWritePath: string | null = null;
 
 function addPullRequest(pullRequest: FakePullRequest): void {
 	fakePullRequests.set(pullRequest.number, pullRequest);
@@ -110,6 +112,11 @@ async function fakeGitHub(input: string | URL | Request, init?: RequestInit): Pr
 			path,
 			body: JSON.parse(String(init?.body))
 		});
+
+		if (path === failNextWritePath) {
+			failNextWritePath = null;
+			return new Response('{"message":"Permission denied"}', { status: 403 });
+		}
 
 		if (method === 'PATCH' && pullRequest) {
 			pullRequest.state = 'closed';
@@ -189,6 +196,28 @@ async function fakeGitHub(input: string | URL | Request, init?: RequestInit): Pr
 
 function findingFor(prNumber: number) {
 	return listFindingsForPullRequest(repo, prNumber)[0];
+}
+
+async function addUnsupportedPullRequest(number: number) {
+	addPullRequest({
+		number,
+		author: `unsupported-${number}`,
+		association: 'CONTRIBUTOR',
+		sha: `unsupported-sha-${number}`,
+		state: 'open',
+		updatedAt: `2026-11-06T00:00:${number}Z`,
+		fileName: `domains/unsupported-${number}.json`,
+		json: {
+			owner: noReplyJson.owner,
+			records: { CNAME: 'site.workers.dev' }
+		}
+	});
+
+	await scanOnce(repo);
+
+	return listFindingsForPullRequest(repo, number).find(
+		(finding) => finding.ruleId === 'unsupportedCname'
+	)!;
 }
 
 before(() => {
@@ -569,5 +598,167 @@ describe('moderation pipeline', () => {
 			assert.equal(writes.at(-1), review);
 			writes.pop();
 		}
+	});
+
+	test('unsupported hosts close with denial labels and a short explanation, even from another finding', async () => {
+		await addUnsupportedPullRequest(10);
+		const findings = listFindingsForPullRequest(repo, 10);
+		const other = findings.find((finding) => finding.ruleId === 'noReplyEmail')!;
+		const writesBefore = writes.length;
+
+		const outcome = await performModerationAction({
+			findingId: other.id,
+			decision: 'approve',
+			source: 'dashboard'
+		});
+
+		const sent = writes.slice(writesBefore);
+
+		assert.equal(outcome.status, 'success');
+		assert.deepEqual(
+			sent.map((write) => `${write.method} ${write.path}`),
+			['POST /issues/10/labels', 'POST /issues/10/comments', 'PATCH /pulls/10']
+		);
+		assert.deepEqual(sent[0].body.labels, ['status: denied', 'reason: incompatible records']);
+		assert.ok(sent[1].body.body?.startsWith('This CNAME target is unsupported.'));
+		assert.ok(sent[1].body.body?.includes('Denied: incompatible records.'));
+		assert.equal(sent[1].body.body?.includes('Please point'), false);
+		assert.equal(fakePullRequests.get(10)?.state, 'closed');
+		assert.ok(
+			listFindingsForPullRequest(repo, 10).every((finding) => finding.status === 'actioned')
+		);
+	});
+
+	test('dry-running unsupported closures sends no labels, comments, or closures', async () => {
+		const finding = await addUnsupportedPullRequest(11);
+		const writesBefore = writes.length;
+		getConfig().dryRun = true;
+
+		try {
+			const outcome = await performModerationAction({
+				findingId: finding.id,
+				decision: 'approve',
+				source: 'discord'
+			});
+
+			assert.equal(outcome.status, 'dryRun');
+			assert.ok(outcome.summary.includes('Close PR'));
+			assert.equal(writes.length, writesBefore);
+			assert.equal(fakePullRequests.get(11)?.state, 'open');
+		} finally {
+			getConfig().dryRun = false;
+		}
+	});
+
+	test('an unsupported host fixed before approval is not denied or closed', async () => {
+		const finding = await addUnsupportedPullRequest(12);
+		const pullRequest = fakePullRequests.get(12)!;
+		pullRequest.sha = 'supported-now';
+		pullRequest.json = {
+			owner: { username: 'fixed' },
+			records: { CNAME: 'site.github.io' }
+		};
+		const writesBefore = writes.length;
+
+		const outcome = await performModerationAction({
+			findingId: finding.id,
+			decision: 'approve',
+			source: 'dashboard'
+		});
+
+		assert.equal(outcome.status, 'skipped');
+		assert.equal(writes.length, writesBefore);
+		assert.equal(pullRequest.state, 'open');
+	});
+
+	test('a labeling failure leaves the PR open and its findings retryable', async () => {
+		const finding = await addUnsupportedPullRequest(13);
+		failNextWritePath = '/issues/13/labels';
+		const writesBefore = writes.length;
+
+		const outcome = await performModerationAction({
+			findingId: finding.id,
+			decision: 'approve',
+			source: 'discord'
+		});
+
+		assert.equal(outcome.status, 'failure');
+		assert.equal(writes.length, writesBefore + 1);
+		assert.equal(fakePullRequests.get(13)?.state, 'open');
+		assert.ok(listFindingsForPullRequest(repo, 13).every((member) => member.status === 'pending'));
+	});
+
+	test('retrying a failed closure does not duplicate its explanation', async () => {
+		const finding = await addUnsupportedPullRequest(14);
+		failNextWritePath = '/pulls/14';
+
+		const decision = {
+			findingId: finding.id,
+			decision: 'approve' as const,
+			source: 'dashboard' as const
+		};
+
+		assert.equal((await performModerationAction(decision)).status, 'failure');
+		assert.equal(fakePullRequests.get(14)?.state, 'open');
+		assert.equal((await performModerationAction(decision)).status, 'success');
+		assert.equal(writes.filter((write) => write.path === '/issues/14/comments').length, 1);
+		assert.equal(fakePullRequests.get(14)?.state, 'closed');
+	});
+
+	test('unsupported targets receive denial labels even when NS findings lead the PR', async () => {
+		const finding = await addUnsupportedPullRequest(15);
+		const pullRequest = fakePullRequests.get(15)!;
+		pullRequest.association = 'NONE';
+		pullRequest.json = {
+			owner: { username: 'unsupported' },
+			records: {
+				NS: ['ns1.example.com'],
+				CNAME: 'site.workers.dev'
+			}
+		};
+		await scanOnce(repo);
+		assert.ok(listFindingsForPullRequest(repo, 15).some((member) => member.ruleId === 'nsRecords'));
+		const writesBefore = writes.length;
+
+		const outcome = await performModerationAction({
+			findingId: finding.id,
+			decision: 'approve',
+			source: 'dashboard'
+		});
+
+		assert.equal(outcome.status, 'success');
+		assert.deepEqual(writes[writesBefore].body.labels, [
+			'status: denied',
+			'reason: incompatible records'
+		]);
+	});
+
+	test('old unsupported-host change requests are still dismissed when fixed', async () => {
+		const finding = await addUnsupportedPullRequest(16);
+		const pullRequest = fakePullRequests.get(16)!;
+		setFindingStatus(finding.id, 'actioned');
+		writes.push({
+			method: 'POST',
+			path: '/pulls/16/reviews',
+			body: {
+				commit_id: pullRequest.sha,
+				body: `<!-- isATracker:unsupportedCname:${finding.filePath} -->`
+			}
+		});
+		pullRequest.sha = 'legacy-review-fixed';
+		pullRequest.json = {
+			owner: { username: 'fixed' },
+			records: { CNAME: 'site.github.io' }
+		};
+
+		await scanOnce(repo);
+
+		assert.ok(
+			writes.some((write) => write.method === 'PUT' && write.path.startsWith('/pulls/16/reviews/'))
+		);
+		assert.equal(
+			listFindingsForPullRequest(repo, 16).find((member) => member.id === finding.id)?.status,
+			'resolved'
+		);
 	});
 });
